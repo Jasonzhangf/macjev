@@ -6,3 +6,10 @@ __pycache__/
 model/
 runs/
 *.log
+
+# BEGIN APPSDK MANAGED
+.appsdk-control/
+.appsdk/sdk.bin
+/active/lib/
+/generated/
+# END APPSDK MANAGED

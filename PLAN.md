@@ -85,6 +85,11 @@ Deliverables:
 - stable candidate IDs
 - error envelope compatibility
 - SDK smoke tests
+- OpenJev model aliases: `openjev-latest`, `openjev-0.1`, `jev-latest`,
+  `jev-preview`
+- `/v1/models` response shape with a `models` array
+- `/v1/systemone` response envelope with `model`, `answers`, and `usage`
+- optional `OPENJEV_API_KEY` and `OPENJEV_ORIGIN_SECRET` compatibility
 
 Exit criteria:
 
