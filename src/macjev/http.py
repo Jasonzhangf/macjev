@@ -4,14 +4,12 @@ from __future__ import annotations
 
 import hmac
 import json
-import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
-from .errors import MacJevError, ModelNotFound
+from .errors import BackendError, MacJevError, ModelNotFound
 from .service import MODEL_VERSION, DecisionService
 
-MAX_BODY_BYTES = 1_048_576
 MODELS = [
     {
         "name": "openjev-latest",
@@ -34,6 +32,9 @@ class MacJevHandler(BaseHTTPRequestHandler):
     """Expose the minimal Jev-compatible playground API."""
 
     service: DecisionService
+    api_key = ""
+    origin_secret = ""
+    max_body_bytes = 1_048_576
 
     def log_message(self, format: str, *args: Any) -> None:
         print(f"macjev: {self.address_string()} {format % args}")
@@ -56,10 +57,9 @@ class MacJevHandler(BaseHTTPRequestHandler):
         )
 
     def _check_auth(self) -> bool:
-        origin_secret = os.environ.get("OPENJEV_ORIGIN_SECRET", "")
-        if origin_secret:
+        if self.origin_secret:
             supplied = self.headers.get("X-Origin-Secret", "")
-            if not hmac.compare_digest(supplied, origin_secret):
+            if not hmac.compare_digest(supplied, self.origin_secret):
                 self._error(
                     403,
                     "permission_error",
@@ -67,18 +67,18 @@ class MacJevHandler(BaseHTTPRequestHandler):
                 )
                 return False
 
-        api_key = os.environ.get("OPENJEV_API_KEY", "")
-        if api_key:
+        if self.api_key:
             authorization = self.headers.get("Authorization", "")
-            if not authorization:
+            scheme, separator, token = authorization.partition(" ")
+            if not separator or scheme.lower() != "bearer":
                 self._error(
                     403,
                     "authentication_error",
-                    "Must supply an API key.",
+                    "Must supply a Bearer API key.",
                 )
                 return False
-            supplied = authorization.removeprefix("Bearer ").strip()
-            if not hmac.compare_digest(supplied, api_key):
+            supplied = token.strip()
+            if not hmac.compare_digest(supplied, self.api_key):
                 self._error(
                     401,
                     "authentication_error",
@@ -110,7 +110,7 @@ class MacJevHandler(BaseHTTPRequestHandler):
         except ValueError:
             self._error(400, "invalid_request", "invalid Content-Length")
             return
-        if length <= 0 or length > MAX_BODY_BYTES:
+        if length <= 0 or length > self.max_body_bytes:
             self._error(
                 413,
                 "invalid_request",
@@ -125,7 +125,12 @@ class MacJevHandler(BaseHTTPRequestHandler):
             self._error(400, "invalid_json", "request body is not valid JSON")
             return
         except MacJevError as exc:
-            status = 404 if isinstance(exc, ModelNotFound) else 422
+            if isinstance(exc, ModelNotFound):
+                status = 404
+            elif isinstance(exc, BackendError):
+                status = 503
+            else:
+                status = 422
             self._error(status, exc.error_type, str(exc))
             return
 
@@ -139,11 +144,24 @@ class MacJevHandler(BaseHTTPRequestHandler):
         )
 
 
-def serve(service: DecisionService, host: str, port: int) -> None:
+def serve(
+    service: DecisionService,
+    host: str,
+    port: int,
+    *,
+    api_key: str = "",
+    origin_secret: str = "",
+    max_body_bytes: int = 1_048_576,
+) -> None:
     handler = type(
         "BoundMacJevHandler",
         (MacJevHandler,),
-        {"service": service},
+        {
+            "service": service,
+            "api_key": api_key,
+            "origin_secret": origin_secret,
+            "max_body_bytes": max_body_bytes,
+        },
     )
     server = ThreadingHTTPServer((host, port), handler)
     print(f"macjev: backend={service.backend.name} listening=http://{host}:{port}")

@@ -111,7 +111,7 @@ Exit criteria:
 
 ## M5: Formal Implementation
 
-Status: pending.
+Status: production skeleton implemented.
 
 Deliverables:
 
@@ -120,6 +120,15 @@ Deliverables:
 - backend configuration
 - deployment documentation
 - explicit RouteCodex integration boundary
+
+Current implementation:
+
+- `macjev` package CLI and `scripts/macjev-server` entry point
+- `~/.macjev/config.toml` as the single runtime configuration source
+- managed `diffgemma` daemon lifecycle with PID and log ownership
+- backend health and model readiness gate before API startup
+- standard Jev API projected from the existing contract
+- browser adapter protocol reserved without coupling browser state to Jev
 
 Exit criteria:
 

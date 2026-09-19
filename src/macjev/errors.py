@@ -29,3 +29,15 @@ class BackendError(MacJevError):
     """The inference backend failed or returned an invalid response."""
 
     error_type = "backend_error"
+
+
+class ConfigError(MacJevError):
+    """The MacJev runtime configuration is missing or invalid."""
+
+    error_type = "config_error"
+
+
+class DaemonError(MacJevError):
+    """The managed inference daemon failed to start, stop, or report health."""
+
+    error_type = "daemon_error"

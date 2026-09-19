@@ -44,6 +44,25 @@ PYTHONPATH=src python3 -m playground.run_live
 The live path fails if the local Metal server is unavailable. It never falls
 back to mock output.
 
+## Production Runtime
+
+Create the single runtime configuration:
+
+```bash
+PYTHONPATH=src python3 -m macjev.cli config init
+```
+
+Start the managed `diffgemma` daemon and the Jev API:
+
+```bash
+scripts/macjev-server
+```
+
+The runtime reads `~/.macjev/config.toml`, waits for the configured model to
+be healthy before opening the API, and records the managed daemon PID under
+`~/.macjev/run`. See [production runtime](docs/production-runtime.md) for
+configuration and process lifecycle.
+
 ## Tests
 
 ```bash
@@ -67,6 +86,7 @@ resumes interrupted transfers. The q4 blob is about 19 GiB.
 
 ## Status
 
-This repository currently contains the goal, plan, architecture, and
-playground. The formal implementation is intentionally deferred until the
-playground proves the adapter and real backend path.
+The repository now has a production runtime skeleton: the Jev API, managed
+DiffusionGemma daemon lifecycle, TOML configuration, and a goal-driven browser
+adapter boundary. The browser transport implementation remains a separate
+follow-up.

@@ -156,14 +156,14 @@ class HttpTests(unittest.TestCase):
 
 class AuthHttpTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.previous_api_key = os.environ.get("OPENJEV_API_KEY")
-        self.previous_origin_secret = os.environ.get("OPENJEV_ORIGIN_SECRET")
-        os.environ["OPENJEV_API_KEY"] = "api-secret"
-        os.environ["OPENJEV_ORIGIN_SECRET"] = "origin-secret"
         handler = type(
             "AuthTestMacJevHandler",
             (MacJevHandler,),
-            {"service": DecisionService(MockBackend())},
+            {
+                "service": DecisionService(MockBackend()),
+                "api_key": "api-secret",
+                "origin_secret": "origin-secret",
+            },
         )
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
@@ -174,14 +174,6 @@ class AuthHttpTests(unittest.TestCase):
         self.server.shutdown()
         self.server.server_close()
         self.thread.join()
-        if self.previous_api_key is None:
-            os.environ.pop("OPENJEV_API_KEY", None)
-        else:
-            os.environ["OPENJEV_API_KEY"] = self.previous_api_key
-        if self.previous_origin_secret is None:
-            os.environ.pop("OPENJEV_ORIGIN_SECRET", None)
-        else:
-            os.environ["OPENJEV_ORIGIN_SECRET"] = self.previous_origin_secret
 
     def request(self, headers: dict[str, str]) -> urllib.request.Request:
         return urllib.request.Request(
@@ -228,6 +220,26 @@ class AuthHttpTests(unittest.TestCase):
             json.load(error)["detail"]["error_type"], "authentication_error"
         )
         error.close()
+
+    def test_rejects_non_bearer_authorization(self) -> None:
+        for authorization in ("api-secret", "Basic api-secret"):
+            with self.subTest(authorization=authorization):
+                with self.assertRaises(urllib.error.HTTPError) as caught:
+                    urllib.request.urlopen(
+                        self.request(
+                            {
+                                "Authorization": authorization,
+                                "X-Origin-Secret": "origin-secret",
+                            }
+                        )
+                    )
+                error = caught.exception
+                self.assertEqual(error.code, 403)
+                self.assertEqual(
+                    json.load(error)["detail"]["error_type"],
+                    "authentication_error",
+                )
+                error.close()
 
     def test_accepts_valid_auth(self) -> None:
         with urllib.request.urlopen(
