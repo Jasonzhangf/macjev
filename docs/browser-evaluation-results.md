@@ -11,6 +11,10 @@
 - Model: `diffgemma-26b-a4b-it-q4`
 - Sampling: fixed `samples=1`
 - Evidence: `evidence/browser-eval-v1/`
+- Source commit: `0d50b21b02a301f6ee7adae782bc12faceea81d6`
+- Dataset SHA-256: `807329c83a3bbe45fd7099633370d8760c2de286854a431e5f40012c65fb27f6`
+- Report SHA-256: `30ed6f0dff8aa9fc98fdf31d35532b1ab7cadf81e9276cdd9f00bf7dc13a5aa9`
+- Records SHA-256: `ca171dceed67a25b6fb8bf21daa74862878891f0f497ef6ac5e788d2790bfabd`
 
 The run is an action-selection evaluation. No browser was driven and no
 account, network page, login state, screenshot, selector generation, or page
@@ -20,15 +24,15 @@ mutation was involved.
 
 | Mode | Accuracy | Top-2 | Valid target | Errors |
 | --- | ---: | ---: | ---: | ---: |
-| Fresh schema | 0.708 | 1.000 | 0.875 | 0 |
-| Stable schema | 0.750 | 1.000 | 0.958 | 0 |
-| Continuous history | 0.708 | 1.000 | 1.000 | 0 |
-| Schema churn + history | 0.792 | 0.875 | 1.000 | 0 |
+| Fresh schema | 0.750 | 1.000 | 0.875 | 0 |
+| Stable schema | 0.708 | 1.000 | 0.917 | 0 |
+| Continuous history | 0.792 | 1.000 | 1.000 | 0 |
+| Schema churn + history | 0.750 | 0.875 | 1.000 | 0 |
 
 | Scenario | Accuracy | Top-2 | Valid target |
 | --- | ---: | ---: | ---: |
-| Search | 0.917 | 1.000 | 0.917 |
-| Form | 0.563 | 0.938 | 1.000 |
+| Search | 0.896 | 1.000 | 0.896 |
+| Form | 0.604 | 0.938 | 1.000 |
 
 The tested workload supports a narrow conclusion:
 
@@ -52,9 +56,9 @@ candidate minus baseline; negative is faster.
 
 | Comparison | Complete | Prefill | Non-prefill | Denoise |
 | --- | ---: | ---: | ---: | ---: |
-| Stable schema vs fresh schema | -316.4 ms | -316.2 ms | -0.2 ms | -0.2 ms |
-| Continuous history vs stable schema | +269.9 ms | +256.2 ms | +13.6 ms | +13.3 ms |
-| Continuous history vs schema churn | -193.5 ms | -194.7 ms | +1.1 ms | +1.1 ms |
+| Stable schema vs fresh schema | -312.9 ms | -314.4 ms | +1.5 ms | +1.5 ms |
+| Continuous history vs stable schema | +271.6 ms | +259.2 ms | +12.4 ms | +12.2 ms |
+| Continuous history vs schema churn | -212.4 ms | -210.8 ms | -1.6 ms | -1.6 ms |
 
 Interpretation:
 
@@ -66,8 +70,8 @@ Interpretation:
   was slower than stable schema on all 18 follow-up comparisons.
 - Continuous history is still faster than changing the question schema every
   step because schema churn gives back the reusable prefix.
-- The speed effect is in prefill, not denoise. Denoise deltas are near zero
-  and are not a KV-reuse speedup.
+- The material speed effect is in prefill, not denoise. Denoise deltas remain
+  within about 1.6 ms on average and are not the source of the cache gain.
 - `non_prefill_ms` is complete request minus prefill and includes denoise.
   It is reported separately from `denoise_ms`.
 

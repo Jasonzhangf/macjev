@@ -1,0 +1,66 @@
+{
+  "git_head": "0d50b21b02a301f6ee7adae782bc12faceea81d6",
+  "git_status": "",
+  "python": "3.14.6 (main, Jun 10 2026, 10:03:53) [Clang 21.0.0 (clang-2100.0.123.102)]",
+  "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+  "backend": "diffgemma-metal",
+  "model": "diffgemma-26b-a4b-it-q4",
+  "health": {
+    "status": "ok"
+  },
+  "models": {
+    "data": [
+      {
+        "id": "diffgemma-26b-a4b-it-q4",
+        "object": "model",
+        "owned_by": "local"
+      },
+      {
+        "id": "diffgemma-26b-a4b-it-q4:think",
+        "object": "model",
+        "owned_by": "local"
+      },
+      {
+        "id": "diffgemma-26b-a4b-it-q4:think=false",
+        "object": "model",
+        "owned_by": "local"
+      }
+    ],
+    "object": "list"
+  },
+  "dataset": "fixtures/browser-actions-v1.jsonl",
+  "dataset_sha256": "807329c83a3bbe45fd7099633370d8760c2de286854a431e5f40012c65fb27f6",
+  "upstream": "http://127.0.0.1:8080",
+  "timeout_seconds": 180.0,
+  "run_id": "browser-v3-s1-r3-20260919",
+  "repeats": 3,
+  "command": [
+    "/opt/homebrew/opt/python@3.14/bin/python3.14",
+    "/Volumes/extension/code/macjev/playground/browser-eval-20260919/playground/evaluate_browser.py",
+    "--dataset",
+    "fixtures/browser-actions-v1.jsonl",
+    "--output",
+    "runs/browser-actions-v3-samples1-r3",
+    "--upstream",
+    "http://127.0.0.1:8080",
+    "--timeout-seconds",
+    "180",
+    "--run-id",
+    "browser-v3-s1-r3-20260919",
+    "--repeats",
+    "3"
+  ],
+  "modes": [
+    "fresh_schema",
+    "stable_schema",
+    "continuous_history",
+    "schema_churn_history"
+  ],
+  "timing_scope": "DecisionService to complete diffgemma response",
+  "phase_definitions": {
+    "prefill_ms": "prompt/context encoding into KV",
+    "non_prefill_ms": "complete request minus prefill",
+    "denoise_ms": "structured diffusion forward",
+    "complete_ms": "wall-clock service request"
+  }
+}
