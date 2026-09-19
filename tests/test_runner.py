@@ -12,9 +12,36 @@ from evaluation.runner import (
     build_request,
     file_sha256,
     option_order_sensitivity,
+    run_rows,
     summarize_run_speed,
     write_evidence,
 )
+from macjev.backends.base import DecisionBackend
+
+
+class CountingBackend(DecisionBackend):
+    name = "counting-test"
+
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def decide(self, state: object, schema: dict) -> dict:
+        self.calls += 1
+        answer = {
+            "type": "choice",
+            "choice": "b",
+            "probabilities": {"a": 0.25, "b": 0.75},
+        }
+        if schema["questions"][0]["options"][0]["name"] == "b":
+            answer = {
+                "type": "choice",
+                "choice": "b",
+                "probabilities": {"a": 0.75, "b": 0.25},
+            }
+        return {
+            "answers": {"choice-1": answer},
+            "diagnostics": {"timing": {"prefill_ms": 1, "denoise_ms": 2}},
+        }
 
 
 class RunnerTests(unittest.TestCase):
@@ -59,6 +86,33 @@ class RunnerTests(unittest.TestCase):
                 1,
             )
             self.assertIn("timeout", (output / "errors.jsonl").read_text())
+
+    def test_writes_perturbation_evidence_separately(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            rows = root / "rows.jsonl"
+            rows.write_text('{"id":"a"}\n', encoding="utf-8")
+            output = root / "out"
+            write_evidence(
+                output,
+                rows_path=rows,
+                records=[{"id": "a", "option_order": "canonical"}],
+                errors=[],
+                perturbation_records=[
+                    {"id": "a", "option_order": "reversed"}
+                ],
+                perturbation_errors=[],
+                report={"count": 1},
+                provenance={"git_head": "abc"},
+            )
+            self.assertIn(
+                '"reversed"',
+                (output / "perturbation_records.jsonl").read_text(),
+            )
+            self.assertEqual(
+                (output / "records.jsonl").read_text().count("reversed"),
+                0,
+            )
 
     def test_option_order_sensitivity_maps_choice_labels(self) -> None:
         canonical = {
@@ -135,6 +189,85 @@ class RunnerTests(unittest.TestCase):
         result = option_order_sensitivity([canonical, reversed_record])
         self.assertEqual(result["selected_changed_count"], 0)
         self.assertAlmostEqual(result["mean_total_variation"], 0.0)
+
+    def test_reversed_probes_do_not_change_primary_run_metrics(self) -> None:
+        backend = CountingBackend()
+        rows = [
+            {
+                "id": "choice-1",
+                "split": "test",
+                "type": "choice",
+                "cardinality": 2,
+                "scenario": "unit",
+                "source": "unit",
+                "state": "state",
+                "question": {
+                    "instructions": "Pick one",
+                    "criteria": {"a": "A", "b": "B"},
+                },
+                "label": "b",
+            }
+        ]
+        original = run_rows.__globals__["DiffGemmaBackend"]
+        run_rows.__globals__["DiffGemmaBackend"] = lambda **_: backend
+        try:
+            records, errors, speed = run_rows(
+                rows,
+                base_url="http://unused",
+                timeout_seconds=1,
+                warmup=0,
+                repeats=1,
+                concurrency=1,
+                in_process=True,
+                reverse_options=True,
+            )
+        finally:
+            run_rows.__globals__["DiffGemmaBackend"] = original
+
+        self.assertEqual(len(records), 1)
+        self.assertEqual(errors, [])
+        self.assertEqual(speed["measured"]["attempts"], 1)
+        self.assertEqual(speed["measured"]["completed"], 1)
+        self.assertEqual(speed["perturbation"]["attempts"], 1)
+        self.assertEqual(speed["perturbation"]["completed"], 1)
+        self.assertEqual(backend.calls, 2)
+
+    def test_option_order_sensitivity_pairs_each_repeat(self) -> None:
+        records = []
+        for repeat, reversed_choice in ((0, "b"), (1, "a")):
+            records.append(
+                {
+                    "id": "choice-1",
+                    "repeat": repeat,
+                    "type": "choice",
+                    "option_order": "canonical",
+                    "answer": {
+                        "choice": "a",
+                        "probabilities": {"a": 0.8, "b": 0.2},
+                    },
+                }
+            )
+            records.append(
+                {
+                    "id": "choice-1",
+                    "repeat": repeat,
+                    "type": "choice",
+                    "option_order": "reversed",
+                    "answer": {
+                        "choice": reversed_choice,
+                        "probabilities": {"a": 0.2, "b": 0.8},
+                    },
+                }
+            )
+
+        result = option_order_sensitivity(records)
+
+        self.assertEqual(result["count"], 2)
+        self.assertEqual(result["selected_changed_count"], 1)
+        self.assertEqual(
+            [row["repeat"] for row in result["rows"]],
+            [0, 1],
+        )
 
     def test_summarizes_wall_clock_throughput(self) -> None:
         result = summarize_run_speed(

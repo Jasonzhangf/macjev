@@ -398,6 +398,8 @@ def run_rows(
 
     records: list[dict[str, Any]] = []
     errors: list[dict[str, Any]] = []
+    perturbation_records: list[dict[str, Any]] = []
+    perturbation_errors: list[dict[str, Any]] = []
 
     def evaluate_once(
         row: dict[str, Any],
@@ -412,7 +414,10 @@ def run_rows(
                 order,
                 response["answers"][row["id"]],
             )
-            records.append(
+            target = (
+                perturbation_records if order == "reversed" else records
+            )
+            target.append(
                 {
                     "id": row["id"],
                     "split": row["split"],
@@ -432,7 +437,8 @@ def run_rows(
                 }
             )
         except Exception as exc:
-            errors.append(
+            target = perturbation_errors if order == "reversed" else errors
+            target.append(
                 {
                     "id": row["id"],
                     "split": row["split"],
@@ -447,28 +453,42 @@ def run_rows(
                 }
             )
 
-    orders = ["canonical", "reversed"] if reverse_options else ["canonical"]
-    jobs = [
-        (row, repeat, concurrency, order)
-        for order in orders
+    canonical_jobs = [
+        (row, repeat, concurrency, "canonical")
         for repeat in range(repeats)
         for row in rows
     ]
-    measured_started = time.perf_counter()
-    if concurrency == 1:
-        for row, repeat, level, order in jobs:
-            evaluate_once(row, repeat, level, order)
+    def execute_jobs(
+        jobs: list[tuple[dict[str, Any], int, int, str]],
+    ) -> float:
+        started = time.perf_counter()
+        if concurrency == 1:
+            for row, repeat, level, order in jobs:
+                evaluate_once(row, repeat, level, order)
+        else:
+            with ThreadPoolExecutor(max_workers=concurrency) as executor:
+                futures = [
+                    executor.submit(evaluate_once, row, repeat, level, order)
+                    for row, repeat, level, order in jobs
+                ]
+                for future in futures:
+                    future.result()
+        return (time.perf_counter() - started) * 1000.0
+
+    measured_elapsed_ms = execute_jobs(canonical_jobs)
+    if reverse_options:
+        perturbation_jobs = [
+            (row, repeat, concurrency, "reversed")
+            for repeat in range(repeats)
+            for row in rows
+            if row["type"] in {"choice", "score"}
+        ]
+        perturbation_elapsed_ms = execute_jobs(perturbation_jobs)
     else:
-        with ThreadPoolExecutor(max_workers=concurrency) as executor:
-            futures = [
-                executor.submit(evaluate_once, row, repeat, level, order)
-                for row, repeat, level, order in jobs
-            ]
-            for future in futures:
-                future.result()
-    measured_elapsed_ms = (time.perf_counter() - measured_started) * 1000.0
+        perturbation_jobs = []
+        perturbation_elapsed_ms = 0.0
     speed = summarize_run_speed(
-        attempts=len(jobs),
+        attempts=len(canonical_jobs),
         completed=len(records),
         errors=len(errors),
         elapsed_ms=measured_elapsed_ms,
@@ -482,24 +502,35 @@ def run_rows(
         ),
     )
     add_timing_metrics(speed, records)
+    speed["perturbation"] = {
+        "attempts": (
+            len(perturbation_records) + len(perturbation_errors)
+        ),
+        "completed": len(perturbation_records),
+        "errors": len(perturbation_errors),
+        "wall_clock_ms": perturbation_elapsed_ms,
+        "records": perturbation_records,
+        "error_records": perturbation_errors,
+    }
     return records, errors, speed
 
 
 def option_order_sensitivity(
     records: list[dict[str, Any]],
 ) -> dict[str, Any]:
-    canonical: dict[str, dict[str, Any]] = {}
-    reversed_records: dict[str, dict[str, Any]] = {}
+    canonical: dict[tuple[str, int], dict[str, Any]] = {}
+    reversed_records: dict[tuple[str, int], dict[str, Any]] = {}
     for record in records:
+        key = (record["id"], int(record.get("repeat", 0)))
         if record.get("option_order") == "canonical":
-            canonical[record["id"]] = record
+            canonical[key] = record
         elif record.get("option_order") == "reversed":
-            reversed_records[record["id"]] = record
+            reversed_records[key] = record
 
     comparisons = []
-    for row_id in sorted(set(canonical) & set(reversed_records)):
-        left = canonical[row_id]
-        right = reversed_records[row_id]
+    for row_id, repeat in sorted(set(canonical) & set(reversed_records)):
+        left = canonical[(row_id, repeat)]
+        right = reversed_records[(row_id, repeat)]
         if left["type"] not in {"choice", "score"}:
             continue
         left_probabilities = left["answer"]["probabilities"]
@@ -554,6 +585,7 @@ def option_order_sensitivity(
         comparisons.append(
             {
                 "id": row_id,
+                "repeat": repeat,
                 "type": left["type"],
                 "selected_changed": selected_changed,
                 "total_variation": total_variation,
@@ -594,6 +626,8 @@ def write_evidence(
     rows_path: Path,
     records: list[dict[str, Any]],
     errors: list[dict[str, Any]],
+    perturbation_records: list[dict[str, Any]] | None = None,
+    perturbation_errors: list[dict[str, Any]] | None = None,
     report: dict[str, Any],
     provenance: dict[str, Any],
 ) -> None:
@@ -614,6 +648,22 @@ def write_evidence(
         "".join(json.dumps(error, ensure_ascii=False) + "\n" for error in errors),
         encoding="utf-8",
     )
+    if perturbation_records is not None:
+        (output_dir / "perturbation_records.jsonl").write_text(
+            "".join(
+                json.dumps(record, ensure_ascii=False) + "\n"
+                for record in perturbation_records
+            ),
+            encoding="utf-8",
+        )
+    if perturbation_errors is not None:
+        (output_dir / "perturbation_errors.jsonl").write_text(
+            "".join(
+                json.dumps(error, ensure_ascii=False) + "\n"
+                for error in perturbation_errors
+            ),
+            encoding="utf-8",
+        )
     (output_dir / "report.json").write_text(
         json.dumps(report, indent=2, ensure_ascii=False) + "\n",
         encoding="utf-8",

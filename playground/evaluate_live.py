@@ -58,7 +58,10 @@ def main() -> None:
         reverse_options=args.reverse_options,
     )
     report = evaluate_predictions(records, errors=errors, run_speed=speed)
-    report["option_order_sensitivity"] = option_order_sensitivity(records)
+    perturbation = speed.pop("perturbation")
+    report["option_order_sensitivity"] = option_order_sensitivity(
+        records + perturbation["records"]
+    )
     provenance = {
         "git_head": _git_value(repo, "rev-parse", "HEAD"),
         "git_status": _git_value(repo, "status", "--short"),
@@ -76,6 +79,7 @@ def main() -> None:
         "in_process": args.in_process,
         "reverse_options": args.reverse_options,
         "errors": len(errors),
+        "perturbation_errors": perturbation["errors"],
         "run_speed": speed,
     }
     write_evidence(
@@ -83,6 +87,8 @@ def main() -> None:
         rows_path=args.dataset,
         records=records,
         errors=errors,
+        perturbation_records=perturbation["records"],
+        perturbation_errors=perturbation["error_records"],
         report=report,
         provenance=provenance,
     )
