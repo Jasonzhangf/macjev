@@ -44,11 +44,9 @@ class MockBackend:
                 values[index] = 1.0
                 answers[qid] = {
                     "type": "score",
-                    "score": float(index),
-                    "level": index,
-                    "probabilities": {
-                        str(i): value for i, value in enumerate(values)
-                    },
+                    "score": float(index + 1),
+                    "level": levels[index],
+                    "probabilities": dict(zip(levels, values)),
                     "confidence": confidence(values),
                 }
 

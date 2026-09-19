@@ -181,13 +181,17 @@ def normalize_answers(
             }
             continue
 
-        ordered = list(raw_probabilities.items())
-        values = [float(value) for _, value in ordered]
+        expected_labels = list(question["criteria"])
+        if set(raw_probabilities) != set(expected_labels):
+            raise SchemaError(
+                f"backend answers.{qid}.probabilities must match the question candidates"
+            )
+        values = [float(raw_probabilities[label]) for label in expected_labels]
         total = sum(values)
         if total <= 0.0:
             raise SchemaError(f"backend answers.{qid}.probabilities sum to zero")
         values = [value / total for value in values]
-        probabilities = {key: value for (key, _), value in zip(ordered, values)}
+        probabilities = dict(zip(expected_labels, values))
         selected = max(probabilities, key=probabilities.__getitem__)
 
         if kind == "choice":

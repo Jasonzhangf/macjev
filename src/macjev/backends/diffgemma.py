@@ -47,7 +47,10 @@ class DiffGemmaBackend:
             "model": self.model,
             "messages": [
                 {"role": "system", "content": json.dumps(schema, ensure_ascii=False)},
-                {"role": "user", "content": state},
+                {
+                    "role": "user",
+                    "content": json.dumps({"state": state}, ensure_ascii=False),
+                },
             ],
             "stream": False,
         }
