@@ -34,6 +34,7 @@ class ServiceTests(unittest.TestCase):
 
         self.assertGreater(result["answers"]["urgent"]["noul"], 0.8)
         self.assertEqual(result["answers"]["team"]["choice"], "billing")
+        self.assertEqual(result["answers"]["tone"]["score"], 1.0)
         self.assertEqual(result["answers"]["tone"]["level"], "annoyed")
         self.assertTrue(result["diagnostics"]["is_mock"])
 
