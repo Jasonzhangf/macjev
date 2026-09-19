@@ -181,6 +181,29 @@ class EvaluationMetricTests(unittest.TestCase):
         self.assertEqual(report["overall"]["accuracy"], 1.0)
         self.assertAlmostEqual(report["overall"]["brier"], 0.26)
 
+    def test_score_accuracy_uses_probability_mode(self) -> None:
+        report = evaluate_predictions(
+            [
+                record(
+                    "score-mode",
+                    answer={
+                        "type": "score",
+                        "score": 0.6,
+                        "confidence": 0.05,
+                        "probabilities": {
+                            "0": 0.40,
+                            "1": 0.35,
+                            "2": 0.25,
+                        },
+                    },
+                    label=0,
+                    kind="score",
+                    cardinality=3,
+                )
+            ]
+        )
+        self.assertEqual(report["overall"]["accuracy"], 1.0)
+
     def test_speed_and_suitability_slices(self) -> None:
         report = evaluate_predictions(
             [

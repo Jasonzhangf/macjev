@@ -12,6 +12,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
 
+from evaluation.metrics import selected_probability_label
 from macjev.backends.diffgemma import DiffGemmaBackend
 from macjev.service import DecisionService
 
@@ -532,18 +533,14 @@ def option_order_sensitivity(
         else:
             left_legend = left["answer"].get("legend", {})
             right_legend = right["answer"].get("legend", {})
-            left_score = left["answer"].get("score")
-            right_score = right["answer"].get("score")
             left_selected = (
-                left_legend.get(str(round(float(left_score))))
+                left_legend.get(selected_probability_label(left["answer"]))
                 if isinstance(left_legend, dict)
-                and isinstance(left_score, (int, float))
                 else None
             )
             right_selected = (
-                right_legend.get(str(round(float(right_score))))
+                right_legend.get(selected_probability_label(right["answer"]))
                 if isinstance(right_legend, dict)
-                and isinstance(right_score, (int, float))
                 else None
             )
             selected_changed = left_selected != right_selected

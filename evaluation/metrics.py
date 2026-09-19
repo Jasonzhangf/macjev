@@ -11,6 +11,15 @@ class EvaluationError(ValueError):
     """Prediction evidence is malformed or not evaluable."""
 
 
+def selected_probability_label(answer: dict[str, Any]) -> str:
+    """Return the modal candidate using stable probability order for ties."""
+
+    raw = answer.get("probabilities")
+    if not isinstance(raw, dict) or not raw:
+        raise EvaluationError("probabilities missing")
+    return max(raw, key=lambda label: float(raw[label]))
+
+
 def _probabilities(record: dict[str, Any]) -> list[float]:
     answer = record["answer"]
     if not isinstance(answer, dict):
@@ -59,13 +68,9 @@ def _selected_index(record: dict[str, Any], probabilities: list[float]) -> int:
         selected = bool(answer.get("noul", 0.0) >= 0.5)
         return int(selected)
     if answer.get("type") == "score":
-        score = answer.get("score")
-        if isinstance(score, bool) or not isinstance(score, (int, float)):
-            raise EvaluationError(f"{record['id']}: score missing")
-        index = round(float(score))
-        if index < 0 or index >= len(probabilities):
-            raise EvaluationError(f"{record['id']}: score is out of range")
-        return index
+        selected = selected_probability_label(answer)
+        labels = list(answer["probabilities"])
+        return labels.index(selected)
     labels = list(answer["probabilities"])
     selected = answer.get("choice")
     if selected not in labels:
