@@ -1,0 +1,21 @@
+[project]
+name = "macjev"
+version = "0.0.1"
+description = "Mac-native Jev-compatible backend experiment on DiffusionGemma"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Apache-2.0" }
+
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

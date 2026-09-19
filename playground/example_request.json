@@ -1,0 +1,30 @@
+{
+  "state": "Since this morning the dashboard shows a blank page after login. Console says 500 from /api/session. All customers are affected.",
+  "questions": {
+    "urgent": {
+      "type": "noul",
+      "instructions": "Does this need a reply today?"
+    },
+    "team": {
+      "type": "choice",
+      "instructions": "Which team owns this?",
+      "criteria": {
+        "billing": "Payment or subscription issues",
+        "support": "Customer account or usage issues",
+        "engineering": "A defect or outage"
+      }
+    },
+    "tone": {
+      "type": "score",
+      "instructions": "How urgent is the customer tone?",
+      "criteria": [
+        "calm",
+        "annoyed",
+        "furious"
+      ]
+    }
+  },
+  "options": {
+    "samples": "auto"
+  }
+}
