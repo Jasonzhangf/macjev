@@ -26,6 +26,9 @@ curl http://127.0.0.1:8090/v1/systemone \
   --data-binary @playground/example_request.json
 ```
 
+The example request includes `model: "jev-latest"`, one of the accepted
+TypeSafe aliases. The public response is `model`, `answers`, and `usage`.
+
 Probe a local `diffgemma` server:
 
 ```bash

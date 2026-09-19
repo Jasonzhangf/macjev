@@ -1,4 +1,5 @@
 {
+  "model": "jev-latest",
   "state": "Since this morning the dashboard shows a blank page after login. Console says 500 from /api/session. All customers are affected.",
   "questions": {
     "urgent": {

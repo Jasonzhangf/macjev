@@ -24,7 +24,6 @@ def main() -> None:
     args = parser.parse_args()
 
     request_body = json.loads(args.request.read_text(encoding="utf-8"))
-    request_body["model"] = "jev-latest"
     backend = DiffGemmaBackend(args.upstream, args.model)
     started = time.perf_counter()
     result = DecisionService(backend).decide(request_body)

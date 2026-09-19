@@ -7,6 +7,7 @@ import unittest
 import urllib.error
 import urllib.request
 from http.server import ThreadingHTTPServer
+from pathlib import Path
 
 from macjev.backends.mock import MockBackend
 from macjev.http import MacJevHandler
@@ -134,6 +135,23 @@ class HttpTests(unittest.TestCase):
         detail = json.load(error)["detail"]
         error.close()
         self.assertEqual(detail["error_type"], "schema_error")
+
+    def test_documented_example_request_is_valid(self) -> None:
+        example = json.loads(
+            Path(__file__).parents[1]
+            .joinpath("playground", "example_request.json")
+            .read_text(encoding="utf-8")
+        )
+        request = urllib.request.Request(
+            self.base_url + "/v1/systemone",
+            data=json.dumps(example).encode(),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(request) as response:
+            result = json.load(response)
+
+        self.assertEqual(result["model"], "openjev-0.1")
 
 
 class AuthHttpTests(unittest.TestCase):
