@@ -141,11 +141,14 @@ has been read and parsed. Throughput is never derived from the sum of
 per-request latencies because that is invalid under concurrency. It is measured
 as completed requests divided by the wall-clock duration of the measured run.
 
-Prefill and denoise are reported as separate phases from the backend timing
-diagnostics. Prefill encodes the prompt and context into KV state; denoise is
-the structured diffusion forward that reads the answer canvas. The report
-also includes their p50 values and their share of measured request time. A
-request with prompt reuse can have near-zero prefill, so the report records
+Prefill and non-prefill latency are reported separately. Prefill encodes the
+prompt and context into KV state. Non-prefill is defined as complete request
+time minus prefill, so it includes the structured diffusion denoise phase and
+the remaining framework overhead. The backend's narrower `denoise_ms` and
+`other_ms = request - prefill - denoise` values are also reported. These
+quantities are not interchangeable.
+
+A request with prompt reuse can have near-zero prefill, so the report records
 `reused_tokens` alongside the phase timing and splits fresh prefill from reused
 prefill.
 

@@ -96,12 +96,18 @@ def _timing_metrics(records: list[dict[str, Any]]) -> dict[str, Any]:
             max(0.0, latency - prefill_value - denoise_value)
             for latency, prefill_value, denoise_value in zip(total, prefill, denoise)
         ]
+        non_prefill = [
+            max(0.0, latency - prefill_value)
+            for latency, prefill_value in zip(total, prefill)
+        ]
         metrics["request_breakdown"] = {
             "count": len(observed),
             "prefill_p50_ms": _percentile(prefill, 0.50),
+            "non_prefill_p50_ms": _percentile(non_prefill, 0.50),
             "denoise_p50_ms": _percentile(denoise, 0.50),
             "other_p50_ms": _percentile(other, 0.50),
             "prefill_share": sum(prefill) / sum(total),
+            "non_prefill_share": sum(non_prefill) / sum(total),
             "denoise_share": sum(denoise) / sum(total),
             "other_share": sum(other) / sum(total),
         }
@@ -129,9 +135,11 @@ def _timing_metrics(records: list[dict[str, Any]]) -> dict[str, Any]:
         metrics["request_breakdown"] = {
             "count": 0,
             "prefill_p50_ms": None,
+            "non_prefill_p50_ms": None,
             "denoise_p50_ms": None,
             "other_p50_ms": None,
             "prefill_share": None,
+            "non_prefill_share": None,
             "denoise_share": None,
             "other_share": None,
         }
@@ -190,6 +198,39 @@ def _reverse_criteria(row: dict[str, Any]) -> dict[str, Any]:
             **question,
             "criteria": reversed_criteria,
         },
+    }
+
+
+def _canonicalize_answer(
+    row: dict[str, Any],
+    order: str,
+    answer: dict[str, Any],
+) -> dict[str, Any]:
+    """Map order-sensitive positional score fields back to dataset order."""
+
+    if order != "reversed" or row["type"] != "score":
+        return answer
+    criteria = row["question"].get("criteria")
+    if not isinstance(criteria, list):
+        raise ValueError("score criteria must be an array")
+    size = len(criteria)
+    raw_probabilities = answer.get("probabilities")
+    if not isinstance(raw_probabilities, dict):
+        raise ValueError("score answer probabilities must be an object")
+    raw_score = answer.get("score")
+    if not isinstance(raw_score, (int, float)) or isinstance(raw_score, bool):
+        raise ValueError("score answer score must be numeric")
+    probabilities = {
+        str(index): raw_probabilities[str(size - 1 - index)]
+        for index in range(size)
+    }
+    return {
+        **answer,
+        "score": size - 1 - float(raw_score),
+        "legend": {
+            str(index): level for index, level in enumerate(criteria)
+        },
+        "probabilities": probabilities,
     }
 
 
@@ -285,6 +326,7 @@ def summarize_run_speed(
         },
         "phase_scope": {
             "prefill_ms": "diffgemma prompt/context prefill",
+            "non_prefill_ms": "request total minus prefill; includes denoise",
             "denoise_ms": "diffgemma structured diffusion forward",
             "other_ms": "request total minus prefill and denoise",
         },
@@ -339,7 +381,11 @@ def run_rows(
     ) -> None:
         try:
             response, elapsed_ms, timing = invoke(row, order)
-            answer = response["answers"][row["id"]]
+            answer = _canonicalize_answer(
+                row,
+                order,
+                response["answers"][row["id"]],
+            )
             records.append(
                 {
                     "id": row["id"],
@@ -456,20 +502,56 @@ def option_order_sensitivity(
                 for label in left_probabilities
             }
         else:
+            left_legend = left["answer"].get("legend", {})
+            right_legend = right["answer"].get("legend", {})
+            if not isinstance(left_legend, dict) or not isinstance(
+                right_legend, dict
+            ):
+                continue
+            right_by_label = {
+                right_legend[str(index)]: right_probabilities[str(index)]
+                for index in range(len(right_probabilities))
+            }
+            left_labels = [
+                left_legend[str(index)]
+                for index in range(len(left_probabilities))
+            ]
             right_values = {
-                str(index): right_probabilities[str(index)]
+                str(index): right_by_label[left_labels[index]]
                 for index in range(len(left_probabilities))
             }
         total_variation = 0.5 * sum(
             abs(float(left_probabilities[key]) - float(right_values[key]))
             for key in left_probabilities
         )
+        if left["type"] == "choice":
+            selected_changed = (
+                left["answer"].get("choice")
+                != right["answer"].get("choice")
+            )
+        else:
+            left_legend = left["answer"].get("legend", {})
+            right_legend = right["answer"].get("legend", {})
+            left_score = left["answer"].get("score")
+            right_score = right["answer"].get("score")
+            left_selected = (
+                left_legend.get(str(round(float(left_score))))
+                if isinstance(left_legend, dict)
+                and isinstance(left_score, (int, float))
+                else None
+            )
+            right_selected = (
+                right_legend.get(str(round(float(right_score))))
+                if isinstance(right_legend, dict)
+                and isinstance(right_score, (int, float))
+                else None
+            )
+            selected_changed = left_selected != right_selected
         comparisons.append(
             {
                 "id": row_id,
                 "type": left["type"],
-                "selected_changed": left["answer"].get("choice", left["answer"].get("score"))
-                != right["answer"].get("choice", right["answer"].get("score")),
+                "selected_changed": selected_changed,
                 "total_variation": total_variation,
             }
         )

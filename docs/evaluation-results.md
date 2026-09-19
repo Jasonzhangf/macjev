@@ -29,8 +29,13 @@ response intentionally does not expose internal timing diagnostics.
 | Phase | Samples | p50 ms | Share of request |
 | --- | ---: | ---: | ---: |
 | Fresh prefill | 15 | 1450 | 70.1% |
+| Non-prefill, all rows | 15 | 851 | 29.9% |
 | Denoise, all rows | 15 | 850 | 29.9% |
 | Framework/other | 15 | 1.1 | 0.1% |
+
+Non-prefill is `complete request - prefill`; it contains denoise plus
+framework overhead. Denoise is the backend's narrower structured-diffusion
+phase, not a synonym for all non-prefill work.
 
 All 15 unique prompts were fresh prefill (`reused_tokens=0`). In a separate
 warmup/repeat run, only the immediately repeated prompt reused KV state:

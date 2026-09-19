@@ -6,6 +6,7 @@ import unittest
 from pathlib import Path
 
 from evaluation.runner import (
+    _canonicalize_answer,
     _timing_metrics,
     build_request,
     file_sha256,
@@ -81,6 +82,59 @@ class RunnerTests(unittest.TestCase):
         self.assertEqual(result["selected_changed_count"], 1)
         self.assertAlmostEqual(result["mean_total_variation"], 0.5)
 
+    def test_canonicalizes_reversed_score_answer(self) -> None:
+        row = {
+            "id": "score-1",
+            "type": "score",
+            "question": {
+                "instructions": "How severe?",
+                "criteria": ["low", "medium", "high"],
+            },
+        }
+        answer = {
+            "type": "score",
+            "score": 1.8,
+            "level": "low",
+            "legend": {"0": "high", "1": "medium", "2": "low"},
+            "probabilities": {"0": 0.1, "1": 0.2, "2": 0.7},
+            "confidence": 0.5,
+        }
+        result = _canonicalize_answer(row, "reversed", answer)
+        self.assertAlmostEqual(result["score"], 0.2)
+        self.assertEqual(
+            result["legend"],
+            {"0": "low", "1": "medium", "2": "high"},
+        )
+        self.assertEqual(
+            result["probabilities"],
+            {"0": 0.7, "1": 0.2, "2": 0.1},
+        )
+
+    def test_option_order_sensitivity_maps_score_semantics(self) -> None:
+        canonical = {
+            "id": "score-1",
+            "type": "score",
+            "option_order": "canonical",
+            "answer": {
+                "score": 0.2,
+                "legend": {"0": "low", "1": "medium", "2": "high"},
+                "probabilities": {"0": 0.7, "1": 0.2, "2": 0.1},
+            },
+        }
+        reversed_record = {
+            "id": "score-1",
+            "type": "score",
+            "option_order": "reversed",
+            "answer": {
+                "score": 1.8,
+                "legend": {"0": "high", "1": "medium", "2": "low"},
+                "probabilities": {"0": 0.1, "1": 0.2, "2": 0.7},
+            },
+        }
+        result = option_order_sensitivity([canonical, reversed_record])
+        self.assertEqual(result["selected_changed_count"], 0)
+        self.assertAlmostEqual(result["mean_total_variation"], 0.0)
+
     def test_summarizes_wall_clock_throughput(self) -> None:
         result = summarize_run_speed(
             attempts=4,
@@ -134,7 +188,12 @@ class RunnerTests(unittest.TestCase):
         self.assertEqual(result["denoise_ms"]["p50"], 400.0)
         self.assertEqual(result["request_breakdown"]["count"], 2)
         self.assertAlmostEqual(result["request_breakdown"]["prefill_share"], 0.4444444444)
+        self.assertAlmostEqual(
+            result["request_breakdown"]["non_prefill_share"],
+            0.5555555556,
+        )
         self.assertAlmostEqual(result["request_breakdown"]["denoise_share"], 0.4444444444)
+        self.assertEqual(result["request_breakdown"]["non_prefill_p50_ms"], 500.0)
         self.assertEqual(result["prefill_cache"]["fresh_p50_ms"], 600.0)
         self.assertEqual(result["prefill_cache"]["reused_p50_ms"], 200.0)
 
