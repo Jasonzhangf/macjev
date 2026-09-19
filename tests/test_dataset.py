@@ -46,4 +46,3 @@ class DatasetTests(unittest.TestCase):
             path = Path(directory) / "rows.jsonl"
             path.write_text(json.dumps(row) + "\n", encoding="utf-8")
             self.assertEqual(load_rows(path)[0]["id"], "noul-1")
-
