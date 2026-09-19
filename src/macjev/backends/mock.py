@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from ..schema import confidence
@@ -12,9 +13,16 @@ class MockBackend:
 
     name = "mock"
 
-    def decide(self, state: str, schema: dict[str, Any]) -> dict[str, Any]:
+    def decide(self, state: Any, schema: dict[str, Any]) -> dict[str, Any]:
         answers: dict[str, Any] = {}
-        urgent = any(word in state.lower() for word in ("outage", "500", "urgent"))
+        state_text = (
+            state
+            if isinstance(state, str)
+            else json.dumps(state, ensure_ascii=False, separators=(",", ":"))
+        )
+        urgent = any(
+            word in state_text.lower() for word in ("outage", "500", "urgent")
+        )
 
         for question in schema["questions"]:
             qid = question["id"]
@@ -55,6 +63,6 @@ class MockBackend:
             "diagnostics": {
                 "backend": self.name,
                 "is_mock": True,
-                "state_length": len(state),
+                "state_length": len(state_text),
             },
         }

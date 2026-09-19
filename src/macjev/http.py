@@ -2,14 +2,28 @@
 
 from __future__ import annotations
 
+import hmac
 import json
+import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
-from .errors import MacJevError
-from .service import DecisionService
+from .errors import MacJevError, ModelNotFound
+from .service import MODEL_VERSION, DecisionService
 
 MAX_BODY_BYTES = 1_048_576
+MODELS = [
+    {
+        "name": "openjev-latest",
+        "description": f"Alias for {MODEL_VERSION}.",
+        "release_date": "2026-09-19",
+    },
+    {
+        "name": MODEL_VERSION,
+        "description": "DiffusionGemma 26B-A4B on the Mac Metal backend.",
+        "release_date": "2026-09-19",
+    },
+]
 
 
 def _json_bytes(value: Any) -> bytes:
@@ -33,56 +47,74 @@ class MacJevHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(payload)
 
+    def _error(
+        self, status: int, error_type: str, message: str
+    ) -> None:
+        self._send(
+            status,
+            {"detail": {"error_type": error_type, "message": message}},
+        )
+
+    def _check_auth(self) -> bool:
+        origin_secret = os.environ.get("OPENJEV_ORIGIN_SECRET", "")
+        if origin_secret:
+            supplied = self.headers.get("X-Origin-Secret", "")
+            if not hmac.compare_digest(supplied, origin_secret):
+                self._error(
+                    403,
+                    "permission_error",
+                    "Direct access to this origin is not allowed.",
+                )
+                return False
+
+        api_key = os.environ.get("OPENJEV_API_KEY", "")
+        if api_key:
+            authorization = self.headers.get("Authorization", "")
+            if not authorization:
+                self._error(
+                    403,
+                    "authentication_error",
+                    "Must supply an API key.",
+                )
+                return False
+            supplied = authorization.removeprefix("Bearer ").strip()
+            if not hmac.compare_digest(supplied, api_key):
+                self._error(
+                    401,
+                    "authentication_error",
+                    "Cannot authenticate with the server.",
+                )
+                return False
+        return True
+
     def do_GET(self) -> None:
+        if not self._check_auth():
+            return
         if self.path == "/health":
             self._send(200, {"status": "ok", "backend": self.service.backend.name})
             return
         if self.path == "/v1/models":
-            self._send(
-                200,
-                {
-                    "object": "list",
-                    "data": [
-                        {
-                            "id": "macjev-playground",
-                            "object": "model",
-                            "owned_by": "local",
-                        }
-                    ],
-                },
-            )
+            self._send(200, {"models": MODELS})
             return
-        self._send(404, {"detail": {"error_type": "not_found", "message": "unknown route"}})
+        self._error(404, "not_found_error", "unknown route")
 
     def do_POST(self) -> None:
+        if not self._check_auth():
+            return
         if self.path != "/v1/systemone":
-            self._send(
-                404, {"detail": {"error_type": "not_found", "message": "unknown route"}}
-            )
+            self._error(404, "not_found_error", "unknown route")
             return
 
         try:
             length = int(self.headers.get("Content-Length", "0"))
         except ValueError:
-            self._send(
-                400,
-                {
-                    "detail": {
-                        "error_type": "invalid_request",
-                        "message": "invalid Content-Length",
-                    }
-                },
-            )
+            self._error(400, "invalid_request", "invalid Content-Length")
             return
         if length <= 0 or length > MAX_BODY_BYTES:
-            self._send(
+            self._error(
                 413,
-                {
-                    "detail": {
-                        "error_type": "invalid_request",
-                        "message": "request body is empty or too large",
-                    }
-                },
+                "invalid_request",
+                "request body is empty or too large",
             )
             return
 
@@ -90,29 +122,21 @@ class MacJevHandler(BaseHTTPRequestHandler):
             request = json.loads(self.rfile.read(length))
             result = self.service.decide(request)
         except json.JSONDecodeError:
-            self._send(
-                400,
-                {
-                    "detail": {
-                        "error_type": "invalid_json",
-                        "message": "request body is not valid JSON",
-                    }
-                },
-            )
+            self._error(400, "invalid_json", "request body is not valid JSON")
             return
         except MacJevError as exc:
-            self._send(
-                422,
-                {
-                    "detail": {
-                        "error_type": exc.error_type,
-                        "message": str(exc),
-                    }
-                },
-            )
+            status = 404 if isinstance(exc, ModelNotFound) else 422
+            self._error(status, exc.error_type, str(exc))
             return
 
-        self._send(200, result)
+        self._send(
+            200,
+            {
+                "model": result["model"],
+                "answers": result["answers"],
+                "usage": result["usage"],
+            },
+        )
 
 
 def serve(service: DecisionService, host: str, port: int) -> None:

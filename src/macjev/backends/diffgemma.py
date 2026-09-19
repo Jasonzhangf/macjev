@@ -39,7 +39,7 @@ class DiffGemmaBackend:
         )
         return self._request_json(request)
 
-    def decide(self, state: str, schema: dict[str, Any]) -> dict[str, Any]:
+    def decide(self, state: Any, schema: dict[str, Any]) -> dict[str, Any]:
         if self.schema_options:
             schema = dict(schema)
             schema.update(self.schema_options)

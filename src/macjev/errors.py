@@ -19,6 +19,12 @@ class UnsupportedFeature(MacJevError):
     error_type = "unsupported_feature"
 
 
+class ModelNotFound(MacJevError):
+    """The requested public model alias is not available."""
+
+    error_type = "not_found_error"
+
+
 class BackendError(MacJevError):
     """The inference backend failed or returned an invalid response."""
 

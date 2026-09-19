@@ -15,6 +15,7 @@ class ServiceTests(unittest.TestCase):
     def test_normalizes_all_question_types(self) -> None:
         result = self.service.decide(
             {
+                "model": "jev-latest",
                 "state": "Production outage with 500 responses.",
                 "questions": {
                     "urgent": {"type": "noul", "instructions": "Urgent?"},
@@ -37,11 +38,14 @@ class ServiceTests(unittest.TestCase):
         self.assertEqual(result["answers"]["tone"]["score"], 1.0)
         self.assertEqual(result["answers"]["tone"]["level"], "annoyed")
         self.assertTrue(result["diagnostics"]["is_mock"])
+        self.assertEqual(result["model"], "openjev-0.1")
+        self.assertIn("usage", result)
 
     def test_rejects_images(self) -> None:
         with self.assertRaises(UnsupportedFeature):
             self.service.decide(
                 {
+                    "model": "jev-latest",
                     "state": "state",
                     "images": [{"url": "https://example.invalid/image.png"}],
                     "questions": {"urgent": {"type": "noul"}},
@@ -118,6 +122,7 @@ class ServiceTests(unittest.TestCase):
     def test_preserves_full_backend_response(self) -> None:
         result = self.service.decide(
             {
+                "model": "jev-latest",
                 "state": "state",
                 "questions": {"urgent": {"type": "noul"}},
             }
@@ -127,6 +132,19 @@ class ServiceTests(unittest.TestCase):
             result["diagnostics"]["raw_backend_response"]["diagnostics"]["backend"],
             "mock",
         )
+
+    def test_accepts_structured_json_state(self) -> None:
+        result = self.service.decide(
+            {
+                "model": "openjev-latest",
+                "state": {"message": "Production outage", "attempt": 2},
+                "questions": {
+                    "urgent": {"type": "noul", "instructions": "Urgent?"}
+                },
+            }
+        )
+
+        self.assertGreater(result["answers"]["urgent"]["noul"], 0.8)
 
 
 if __name__ == "__main__":
