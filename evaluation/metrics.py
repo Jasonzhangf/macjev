@@ -115,7 +115,9 @@ def _ece(
 
 
 def _aurc(confidences: list[float], correct: list[bool]) -> float:
-    ordered = sorted(range(len(correct)), key=lambda index: confidences[index])
+    ordered = sorted(
+        range(len(correct)), key=lambda index: confidences[index], reverse=True
+    )
     errors = 0
     area = 0.0
     for rank, index in enumerate(ordered, start=1):
@@ -174,7 +176,6 @@ def _speed_metrics(
     measured = [value for value in latencies if value > 0.0]
     if not measured:
         raise EvaluationError("no measured latency values")
-    elapsed_seconds = sum(measured) / 1000.0
     return {
         "count": len(measured),
         "errors": error_count + sum(bool(record.get("error")) for record in records),
@@ -185,7 +186,7 @@ def _speed_metrics(
         "mean_ms": sum(measured) / len(measured),
         "min_ms": min(measured),
         "max_ms": max(measured),
-        "throughput_rps": len(measured) / elapsed_seconds,
+        "throughput_rps": None,
     }
 
 
@@ -221,6 +222,34 @@ def _evaluate_group(
     thresholds: dict[str, Any] | None = None,
     error_count: int = 0,
 ) -> dict[str, Any]:
+    if not records:
+        result = {
+            "count": 0,
+            "attempts": error_count,
+            "accuracy": None,
+            "nll": None,
+            "brier": None,
+            "ece": None,
+            "ece_bins": [],
+            "aurc": None,
+            "coverage_risk": [],
+            "speed": {
+                "count": 0,
+                "errors": error_count,
+                "p50_ms": None,
+                "p90_ms": None,
+                "p95_ms": None,
+                "p99_ms": None,
+                "mean_ms": None,
+                "min_ms": None,
+                "max_ms": None,
+                "throughput_rps": None,
+            },
+        }
+        if thresholds is not None:
+            result["suitability"] = "inconclusive" if error_count == 0 else "unsuitable"
+        return result
+
     confidences: list[float] = []
     correct: list[bool] = []
     nll = 0.0
@@ -266,10 +295,11 @@ def evaluate_predictions(
     coverages: Iterable[float] = (0.5, 0.7, 0.9),
     thresholds: dict[str, Any] | None = None,
     errors: list[dict[str, Any]] | None = None,
+    run_speed: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Evaluate normalized public answers against labelled rows."""
 
-    if not records:
+    if not records and not errors:
         raise EvaluationError("no prediction records")
     for record in records:
         if not isinstance(record, dict) or not isinstance(record.get("id"), str):
@@ -304,19 +334,6 @@ def evaluate_predictions(
             if field not in error:
                 raise EvaluationError(f"error {error['id']}: {field} is required")
 
-    def matching_errors(
-        group_records: list[dict[str, Any]], dimension: str | None = None
-    ) -> list[dict[str, Any]]:
-        ids = {record["id"] for record in group_records}
-        if dimension is None:
-            return errors
-        values = {record[dimension] for record in group_records}
-        return [
-            error
-            for error in errors
-            if error[dimension] in values and error["id"] in ids
-        ]
-
     # Error rows are expected to carry the same slice fields as dataset rows.
     # They are grouped by stable row identity, not by a substring in an error.
     slices: dict[str, dict[str, Any]] = {}
@@ -327,7 +344,9 @@ def evaluate_predictions(
             groups[str(record[dimension])].append(record)
         error_groups: dict[str, int] = defaultdict(int)
         for error in errors:
-            error_groups[str(error[dimension])] += 1
+            value = str(error[dimension])
+            error_groups[value] += 1
+            groups.setdefault(value, [])
         slices[dimension] = {
             value: _evaluate_group(
                 group,
@@ -343,7 +362,9 @@ def evaluate_predictions(
         combined[f"{record['split']}:{record['type']}"].append(record)
     split_type_errors: dict[str, int] = defaultdict(int)
     for error in errors:
-        split_type_errors[f"{error['split']}:{error['type']}"] += 1
+        value = f"{error['split']}:{error['type']}"
+        split_type_errors[value] += 1
+        combined.setdefault(value, [])
     slices["split_type"] = {
         value: _evaluate_group(
             group,
@@ -356,6 +377,8 @@ def evaluate_predictions(
     matrix: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for record in records:
         matrix[record["scenario"]].append(record)
+    for error in errors:
+        matrix.setdefault(error["scenario"], [])
     suitability_matrix: dict[str, list[dict[str, Any]]] = {}
     for scenario, scenario_records in sorted(matrix.items()):
         groups: dict[tuple[str, int], list[dict[str, Any]]] = defaultdict(list)
@@ -364,7 +387,9 @@ def evaluate_predictions(
         matrix_errors: dict[tuple[str, int], int] = defaultdict(int)
         for error in errors:
             if error["scenario"] == scenario:
-                matrix_errors[(error["type"], error["cardinality"])] += 1
+                key = (error["type"], error["cardinality"])
+                matrix_errors[key] += 1
+                groups.setdefault(key, [])
         suitability_matrix[scenario] = [
             {
                 "type": kind,
@@ -378,18 +403,39 @@ def evaluate_predictions(
             }
             for (kind, cardinality), group in sorted(groups.items())
         ]
+    overall = _evaluate_group(
+        records,
+        coverages,
+        thresholds,
+        len(errors),
+    )
+    if run_speed is not None:
+        measured_run = run_speed.get("measured")
+        if not isinstance(measured_run, dict):
+            raise EvaluationError("run_speed.measured must be an object")
+        if measured_run.get("completed") != len(records):
+            raise EvaluationError("run_speed completed count does not match records")
+        if measured_run.get("errors") != len(errors):
+            raise EvaluationError("run_speed error count does not match errors")
+        throughput = measured_run.get("successful_rps")
+        wall_clock_ms = measured_run.get("wall_clock_ms")
+        if not isinstance(throughput, (int, float)) or isinstance(throughput, bool):
+            raise EvaluationError("run_speed successful_rps must be numeric")
+        if not isinstance(wall_clock_ms, (int, float)) or isinstance(
+            wall_clock_ms, bool
+        ):
+            raise EvaluationError("run_speed wall_clock_ms must be numeric")
+        overall["speed"]["throughput_rps"] = float(throughput)
+        overall["speed"]["wall_clock_ms"] = float(wall_clock_ms)
+
     return {
-        "metric_version": 1,
+        "metric_version": 2,
         "count": len(records),
         "error_count": len(errors),
         "policy_id": "evaluation-policy-v1",
         "thresholds": thresholds,
-        "overall": _evaluate_group(
-            records,
-            coverages,
-            thresholds,
-            len(errors),
-        ),
+        "overall": overall,
+        "run_speed": run_speed,
         "slices": slices,
         "suitability_matrix": suitability_matrix,
     }

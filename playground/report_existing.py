@@ -28,7 +28,17 @@ def main() -> None:
         ).splitlines()
         if line.strip()
     ]
-    report = evaluate_predictions(records, errors=errors)
+    provenance_path = args.run_dir / "provenance.json"
+    provenance = (
+        json.loads(provenance_path.read_text(encoding="utf-8"))
+        if provenance_path.exists()
+        else {}
+    )
+    report = evaluate_predictions(
+        records,
+        errors=errors,
+        run_speed=provenance.get("run_speed"),
+    )
     (args.run_dir / "report.json").write_text(
         json.dumps(report, indent=2, ensure_ascii=False) + "\n",
         encoding="utf-8",

@@ -12,21 +12,65 @@
 - Brier: 0.243
 - ECE: 0.119
 - AURC: 0.220
-- p50 latency: 2211 ms
-- p95 latency: 2493 ms
-- Throughput: 0.508 req/s
+- p50 complete-response latency: 2195 ms
+- p95 complete-response latency: 2497 ms
+- Throughput: 0.509 req/s
+
+The latency scope is the public Jev HTTP route, from request dispatch through
+complete JSON response parsing. Throughput is measured from wall-clock runtime,
+not from the sum of per-request latencies.
+
+## Prefill and Denoise
+
+The phase benchmark calls `DecisionService` directly against the same
+`diffgemma` backend. It is a separate evidence scope because the public Jev
+response intentionally does not expose internal timing diagnostics.
+
+| Phase | Samples | p50 ms | Share of request |
+| --- | ---: | ---: | ---: |
+| Fresh prefill | 15 | 1450 | 70.1% |
+| Denoise, all rows | 15 | 850 | 29.9% |
+| Framework/other | 15 | 1.1 | 0.1% |
+
+All 15 unique prompts were fresh prefill (`reused_tokens=0`). In a separate
+warmup/repeat run, only the immediately repeated prompt reused KV state:
+
+- Fresh prefill: 29 requests, p50 1447 ms
+- Reused prefill: 1 request, p50 213 ms
+- Denoise: 30 requests, p50 849 ms
+
+The 0.42 s reused-request path is therefore a cache hit, not the normal
+first-seen latency. Prefill is the dominant cost for these short prompts, and
+the current dataset order gives almost no KV reuse.
+
+Denoise is not autoregressive decode. It is the structured diffusion forward
+over the answer canvas, and its cost depends on the confidence-driven sample
+count:
+
+| Samples | Rows | Prefill p50 ms | Denoise p50 ms |
+| ---: | ---: | ---: | ---: |
+| 1 | 6 | 1378 | 244 |
+| 4 | 9 | 1489 | 859 |
+
+The extra samples raise denoise cost by roughly 3.5 times; prefill remains
+input-length driven.
 
 ## Concurrency
 
 | Concurrency | Errors | p50 ms | p95 ms | Throughput req/s |
 | ---: | ---: | ---: | ---: | ---: |
-| 1 | 0 | 2211 | 2493 | 0.508 |
-| 2 | 0 | 10754 | 13157 | 0.127 |
-| 4 | 0 | 12189 | 13144 | 0.092 |
+| 1 | 0 | 2195 | 2497 | 0.509 |
+| 2 | 0 | 4037 | 4956 | 0.508 |
+| 4 | 0 | 8014 | 9407 | 0.505 |
 
-The backend serializes or heavily contends under concurrent requests. Higher
-concurrency did not improve throughput and increased latency by roughly five
-times.
+The backend serializes or heavily contends under concurrent requests.
+Throughput is effectively flat, while p50 latency scales approximately
+linearly with concurrency. The Mac service should not be treated as a
+parallel-throughput backend without a scheduling or batching change.
+
+TTFT is unavailable because the public Jev path is non-streaming. Process
+startup and model-load time are not measured because the benchmark uses an
+already running, model-resident service.
 
 ## Quality Slices
 

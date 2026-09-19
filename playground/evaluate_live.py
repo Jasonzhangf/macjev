@@ -11,7 +11,7 @@ from pathlib import Path
 
 from evaluation.dataset import load_rows
 from evaluation.metrics import evaluate_predictions
-from evaluation.runner import run_rows, write_evidence
+from evaluation.runner import option_order_sensitivity, run_rows, write_evidence
 from macjev.backends.diffgemma import DiffGemmaBackend
 
 
@@ -36,6 +36,7 @@ def main() -> None:
     parser.add_argument("--repeats", type=int, default=1)
     parser.add_argument("--concurrency", type=int, default=1)
     parser.add_argument("--in-process", action="store_true")
+    parser.add_argument("--reverse-options", action="store_true")
     args = parser.parse_args()
 
     rows = load_rows(args.dataset)
@@ -46,7 +47,7 @@ def main() -> None:
     )
     health = backend.health()
     models = backend.models()
-    records, errors = run_rows(
+    records, errors, speed = run_rows(
         rows,
         base_url=args.base_url,
         timeout_seconds=args.timeout_seconds,
@@ -54,8 +55,10 @@ def main() -> None:
         repeats=args.repeats,
         concurrency=args.concurrency,
         in_process=args.in_process,
+        reverse_options=args.reverse_options,
     )
-    report = evaluate_predictions(records, errors=errors)
+    report = evaluate_predictions(records, errors=errors, run_speed=speed)
+    report["option_order_sensitivity"] = option_order_sensitivity(records)
     provenance = {
         "git_head": _git_value(repo, "rev-parse", "HEAD"),
         "git_status": _git_value(repo, "status", "--short"),
@@ -71,7 +74,9 @@ def main() -> None:
         "repeats": args.repeats,
         "concurrency": args.concurrency,
         "in_process": args.in_process,
+        "reverse_options": args.reverse_options,
         "errors": len(errors),
+        "run_speed": speed,
     }
     write_evidence(
         args.output,

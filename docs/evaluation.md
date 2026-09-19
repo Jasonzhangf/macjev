@@ -11,6 +11,7 @@ The evaluation answers three separate questions:
 1. Is the selected answer correct?
 2. Are the reported probabilities useful as probability estimates?
 3. Does confidence rank errors well enough to support later risk decisions?
+4. Is complete-response latency and throughput suitable for the tested route?
 
 Calibration is a follow-up decision. A calibration split may be recorded in
 the dataset, but this milestone does not fit or apply a calibration transform.
@@ -66,7 +67,8 @@ records:
 - input dataset hash and row ID
 - backend, model, and quantized model directory
 - public response and raw backend diagnostics
-- elapsed milliseconds
+- complete-response elapsed milliseconds
+- backend `prefill_ms`, `denoise_ms`, prompt tokens, and reused tokens
 - errors without fabricating a prediction
 
 Mock results are rejected by the evaluator as model evidence.
@@ -130,9 +132,38 @@ Speed is reported separately from correctness:
 
 - warmup count and measured count
 - p50, p90, p95, p99, mean, minimum, and maximum end-to-end latency
-- throughput in requests per second
+- successful and attempted throughput from measured wall-clock runtime
 - timeout, backend error, and schema error counts
 - concurrency 1, 2, and 4 latency/error observations
+
+Per-request latency runs from request dispatch until the complete JSON response
+has been read and parsed. Throughput is never derived from the sum of
+per-request latencies because that is invalid under concurrency. It is measured
+as completed requests divided by the wall-clock duration of the measured run.
+
+Prefill and denoise are reported as separate phases from the backend timing
+diagnostics. Prefill encodes the prompt and context into KV state; denoise is
+the structured diffusion forward that reads the answer canvas. The report
+also includes their p50 values and their share of measured request time. A
+request with prompt reuse can have near-zero prefill, so the report records
+`reused_tokens` alongside the phase timing and splits fresh prefill from reused
+prefill.
+
+`denoise_ms` is not autoregressive decode time. Structured DiffusionGemma reads
+the answer canvas through one or more denoise forwards. The evaluator records
+samples, rounds, and steps run, and reports phase timing by scenario, question
+type, and sample count. This separates input-length/prefill cost from the
+confidence-driven extra-sample cost.
+
+The public HTTP benchmark measures the Jev route but cannot see private backend
+diagnostics. A separate in-process `DecisionService` benchmark measures
+`prefill_ms` and `denoise_ms` from the same backend execution. Results from the
+two scopes are not merged into one latency distribution.
+
+The current Jev path is non-streaming, so time to first token is unavailable.
+The benchmark also uses an already started, model-resident service, so process
+startup and model-load time are not measured. Both limitations are explicit in
+`run_speed`; neither is inferred from the first warmup request.
 
 The suitability matrix reports `scenario × type × cardinality` with sample
 counts, correctness, probability metrics, and latency. A suitability label is
