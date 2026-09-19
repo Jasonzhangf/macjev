@@ -96,7 +96,7 @@ Exit criteria:
 - TypeSafe SDK or equivalent client can call the playground without a custom
   transport
 
-## M4: Calibration and Quality
+## M4: Evaluation Before Calibration
 
 Status: pending.
 
@@ -108,11 +108,16 @@ Deliverables:
 - Accuracy, NLL, Brier, ECE, AURC, and coverage-risk
 - option-order sensitivity
 - per-question-type and per-cardinality analysis
+- complete-response p50, p90, p95, and p99 latency
+- backend prefill and denoise timing reported separately
+- wall-clock throughput, error rate, and concurrency 1/2/4 degradation
+- explicit TTFT and process-startup observability limits
 
 Exit criteria:
 
-- calibration artifacts are versioned and reproducible
-- confidence gating is based on measured data, not softmax appearance
+- evaluation artifacts are versioned and reproducible
+- accuracy, applicable scenarios, and speed are reported separately
+- no calibrator or confidence gate is selected in this milestone
 
 ## M5: Formal Implementation
 
