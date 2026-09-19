@@ -30,3 +30,17 @@ PYTHONPATH=src python3 -m playground.run_live
 
 The live mode checks `/health` at startup and fails if the backend is not
 available.
+
+## Labelled evaluation
+
+Run the real Metal backend over a labelled JSONL dataset:
+
+```bash
+PYTHONPATH=src:. python3 -m playground.evaluate_live \
+  --dataset fixtures/evaluation-v1.jsonl \
+  --output runs/evaluation-v1
+```
+
+The command records dataset hash, git revision, model provenance, public
+responses, per-request latency, errors, metric slices, and the suitability
+matrix. It does not fit a calibrator or change model weights.
