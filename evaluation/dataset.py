@@ -45,6 +45,22 @@ def load_rows(path: Path) -> list[dict[str, Any]]:
             raise DatasetError(f"{path}:{line_number}: state is required")
         if not isinstance(row.get("question"), dict):
             raise DatasetError(f"{path}:{line_number}: question must be an object")
+        criteria = row["question"].get("criteria")
+        if row["type"] == "noul":
+            expected_cardinality = 2
+        elif row["type"] == "choice" and isinstance(criteria, dict):
+            expected_cardinality = len(criteria)
+        elif row["type"] == "score" and isinstance(criteria, list):
+            expected_cardinality = len(criteria)
+        else:
+            raise DatasetError(
+                f"{path}:{line_number}: criteria shape does not match type"
+            )
+        if row["cardinality"] != expected_cardinality:
+            raise DatasetError(
+                f"{path}:{line_number}: cardinality must be "
+                f"{expected_cardinality} for {row['type']}"
+            )
         if "label" not in row:
             raise DatasetError(f"{path}:{line_number}: label is required")
         if not isinstance(row.get("source"), str) or not row["source"]:
