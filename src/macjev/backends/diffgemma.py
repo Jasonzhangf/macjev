@@ -39,6 +39,22 @@ class DiffGemmaBackend:
         )
         return self._request_json(request)
 
+    def ensure_ready(self) -> None:
+        """Fail unless the configured model is healthy and discoverable."""
+
+        health = self.health()
+        if health.get("status") != "ok":
+            raise BackendError("diffgemma health status is not ok")
+        models = self.models()
+        available = models.get("data")
+        if not isinstance(available, list) or not any(
+            isinstance(model, dict) and model.get("id") == self.model
+            for model in available
+        ):
+            raise BackendError(
+                f"diffgemma does not advertise configured model {self.model!r}"
+            )
+
     def decide(self, state: Any, schema: dict[str, Any]) -> dict[str, Any]:
         if self.schema_options:
             schema = dict(schema)
