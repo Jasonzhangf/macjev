@@ -8,6 +8,7 @@ from pathlib import Path
 from evaluation.runner import (
     _canonicalize_answer,
     _timing_metrics,
+    add_timing_metrics,
     build_request,
     file_sha256,
     option_order_sensitivity,
@@ -196,6 +197,28 @@ class RunnerTests(unittest.TestCase):
         self.assertEqual(result["request_breakdown"]["non_prefill_p50_ms"], 500.0)
         self.assertEqual(result["prefill_cache"]["fresh_p50_ms"], 600.0)
         self.assertEqual(result["prefill_cache"]["reused_p50_ms"], 200.0)
+
+    def test_rebuilds_timing_slices_from_records(self) -> None:
+        records = [
+            {
+                "scenario": "short_text",
+                "type": "score",
+                "latency_ms": 1000.0,
+                "timing": {
+                    "prefill_ms": 600.0,
+                    "denoise_ms": 300.0,
+                    "samples": 1,
+                },
+            }
+        ]
+        speed = {"timing": {"stale": True}}
+        add_timing_metrics(speed, records)
+        self.assertEqual(
+            speed["timing"]["request_breakdown"]["non_prefill_p50_ms"],
+            400.0,
+        )
+        self.assertIn("short_text", speed["timing_slices"]["scenario"])
+        self.assertIn("1", speed["timing_slices"]["samples"])
 
 
 if __name__ == "__main__":

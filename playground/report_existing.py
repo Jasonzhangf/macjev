@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 
 from evaluation.metrics import evaluate_predictions
+from evaluation.runner import add_timing_metrics
 
 
 def main() -> None:
@@ -34,10 +35,13 @@ def main() -> None:
         if provenance_path.exists()
         else {}
     )
+    run_speed = provenance.get("run_speed")
+    if isinstance(run_speed, dict):
+        add_timing_metrics(run_speed, records)
     report = evaluate_predictions(
         records,
         errors=errors,
-        run_speed=provenance.get("run_speed"),
+        run_speed=run_speed,
     )
     (args.run_dir / "report.json").write_text(
         json.dumps(report, indent=2, ensure_ascii=False) + "\n",

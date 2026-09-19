@@ -153,6 +153,31 @@ def _timing_metrics(records: list[dict[str, Any]]) -> dict[str, Any]:
     return metrics
 
 
+def add_timing_metrics(
+    speed: dict[str, Any],
+    records: list[dict[str, Any]],
+) -> None:
+    speed["timing"] = _timing_metrics(records)
+    speed["timing_slices"] = {}
+    for dimension in ("scenario", "type"):
+        groups: dict[str, list[dict[str, Any]]] = {}
+        for record in records:
+            groups.setdefault(str(record[dimension]), []).append(record)
+        speed["timing_slices"][dimension] = {
+            value: _timing_metrics(group)
+            for value, group in sorted(groups.items())
+        }
+    sample_groups: dict[str, list[dict[str, Any]]] = {}
+    for record in records:
+        timing = record.get("timing")
+        if isinstance(timing, dict) and "samples" in timing:
+            sample_groups.setdefault(str(timing["samples"]), []).append(record)
+    speed["timing_slices"]["samples"] = {
+        value: _timing_metrics(group)
+        for value, group in sorted(sample_groups.items())
+    }
+
+
 def file_sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as handle:
@@ -456,25 +481,7 @@ def run_rows(
             else "request_to_complete_public_json_response"
         ),
     )
-    speed["timing"] = _timing_metrics(records)
-    speed["timing_slices"] = {}
-    for dimension in ("scenario", "type"):
-        groups: dict[str, list[dict[str, Any]]] = {}
-        for record in records:
-            groups.setdefault(str(record[dimension]), []).append(record)
-        speed["timing_slices"][dimension] = {
-            value: _timing_metrics(group)
-            for value, group in sorted(groups.items())
-        }
-    sample_groups: dict[str, list[dict[str, Any]]] = {}
-    for record in records:
-        timing = record.get("timing")
-        if isinstance(timing, dict) and "samples" in timing:
-            sample_groups.setdefault(str(timing["samples"]), []).append(record)
-    speed["timing_slices"]["samples"] = {
-        value: _timing_metrics(group)
-        for value, group in sorted(sample_groups.items())
-    }
+    add_timing_metrics(speed, records)
     return records, errors, speed
 
 
