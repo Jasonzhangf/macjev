@@ -55,7 +55,9 @@ in the assistant message. The adapter must translate between the two shapes.
 | Probability distribution | Preserved |
 | Confidence | Recomputed from normalized probabilities |
 | Re-read | Mapped to `diffgemma` sample policy |
-| Diagnostics | Backend diagnostics retained |
+| Public response | `model`, `answers`, `usage` only, matching TypeSafe/OpenJev |
+| Model discovery | `models: [{name, description?, release_date?}]`, matching TypeSafe |
+| Diagnostics | Retained inside the service result and probe evidence, not the public Jev envelope |
 
 ## Request Mapping
 
@@ -135,7 +137,16 @@ DiffusionGemma returns:
 ```
 
 MacJev normalizes this into the stable Jev result shape and preserves the raw
-backend response separately for evidence.
+backend response inside `DecisionService.decide()` diagnostics for local probe
+and evidence. The public `/v1/systemone` response intentionally projects only
+`model`, `answers`, and `usage`, matching the TypeSafe SDK schema and OpenJev
+0.2.0. This prevents internal model diagnostics from becoming a second public
+protocol or leaking backend implementation details to clients.
+
+`usage.output_tokens` is `0` for ordinary reads. This is the explicit Jev and
+OpenJev contract for a non-generative structured read, not an inferred count;
+OpenJev sets it to zero unless a separate `think` pass generates tokens. The
+MacJev M3 path does not enable that extension.
 
 ## Explicit Limits
 

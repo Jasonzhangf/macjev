@@ -88,10 +88,10 @@ class MacJevHandler(BaseHTTPRequestHandler):
         return True
 
     def do_GET(self) -> None:
-        if not self._check_auth():
-            return
         if self.path == "/health":
             self._send(200, {"status": "ok", "backend": self.service.backend.name})
+            return
+        if not self._check_auth():
             return
         if self.path == "/v1/models":
             self._send(200, {"models": MODELS})

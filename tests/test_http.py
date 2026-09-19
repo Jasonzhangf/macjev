@@ -69,6 +69,7 @@ class HttpTests(unittest.TestCase):
         self.assertEqual(result["model"], "openjev-0.1")
         self.assertEqual(result["answers"]["urgent"]["type"], "noul")
         self.assertNotIn("diagnostics", result)
+        self.assertEqual(result["usage"]["output_tokens"], 0)
 
     def test_accepts_json_state_and_all_model_aliases(self) -> None:
         for model in ("openjev-latest", "openjev-0.1", "jev-latest", "jev-preview"):
@@ -181,6 +182,9 @@ class AuthHttpTests(unittest.TestCase):
         )
 
     def test_requires_origin_secret(self) -> None:
+        with urllib.request.urlopen(self.base_url + "/health") as response:
+            self.assertEqual(json.load(response)["status"], "ok")
+
         with self.assertRaises(urllib.error.HTTPError) as caught:
             urllib.request.urlopen(
                 self.request({"Authorization": "Bearer api-secret"})
