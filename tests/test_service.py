@@ -34,7 +34,7 @@ class ServiceTests(unittest.TestCase):
 
         self.assertGreater(result["answers"]["urgent"]["noul"], 0.8)
         self.assertEqual(result["answers"]["team"]["choice"], "billing")
-        self.assertEqual(result["answers"]["tone"]["level"], 1)
+        self.assertEqual(result["answers"]["tone"]["level"], "annoyed")
         self.assertTrue(result["diagnostics"]["is_mock"])
 
     def test_rejects_images(self) -> None:
@@ -63,8 +63,8 @@ class ServiceTests(unittest.TestCase):
                         "score": 2.0,
                         "level": "annoyed",
                         "probabilities": {
-                            "calm": 0.2,
                             "annoyed": 0.7,
+                            "calm": 0.2,
                             "furious": 0.1,
                         },
                     }
@@ -78,6 +78,41 @@ class ServiceTests(unittest.TestCase):
             result["tone"]["legend"],
             {"0": "calm", "1": "annoyed", "2": "furious"},
         )
+        self.assertEqual(
+            result["tone"]["probabilities"],
+            {"0": 0.2, "1": 0.7, "2": 0.1},
+        )
+
+    def test_normalizes_choice_in_request_order(self) -> None:
+        result = normalize_answers(
+            {
+                "team": {
+                    "type": "choice",
+                    "criteria": {
+                        "billing": "Billing",
+                        "support": "Support",
+                        "engineering": "Engineering",
+                    },
+                }
+            },
+            {
+                "answers": {
+                    "team": {
+                        "probabilities": {
+                            "engineering": 0.8,
+                            "billing": 0.1,
+                            "support": 0.1,
+                        }
+                    }
+                }
+            },
+        )
+
+        self.assertEqual(
+            list(result["team"]["probabilities"]),
+            ["billing", "support", "engineering"],
+        )
+        self.assertEqual(result["team"]["choice"], "engineering")
 
     def test_preserves_full_backend_response(self) -> None:
         result = self.service.decide(
