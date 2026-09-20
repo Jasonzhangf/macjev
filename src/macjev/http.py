@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hmac
 import json
+import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
@@ -149,10 +150,14 @@ def serve(
     host: str,
     port: int,
     *,
-    api_key: str = "",
-    origin_secret: str = "",
+    api_key: str | None = None,
+    origin_secret: str | None = None,
     max_body_bytes: int = 1_048_576,
 ) -> None:
+    if api_key is None:
+        api_key = os.environ.get("OPENJEV_API_KEY", "")
+    if origin_secret is None:
+        origin_secret = os.environ.get("OPENJEV_ORIGIN_SECRET", "")
     handler = type(
         "BoundMacJevHandler",
         (MacJevHandler,),
