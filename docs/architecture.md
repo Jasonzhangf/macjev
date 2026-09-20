@@ -18,7 +18,7 @@ Backend interface
         +-- DiffGemmaBackend  real Mac Metal inference
                 |
                 v
-        diffgemma serve
+        diffgemma serve or macjev optiq-serve
                 |
                 v
         DiffusionGemma Metal
@@ -151,7 +151,10 @@ MacJev M3 path does not enable that extension.
 ## Explicit Limits
 
 - `diffgemma` currently supports at most 26 choice candidates.
-- The Mac Metal engine is text-only in the current release.
+- The legacy `diffgemma serve` path is text-only in the current release.
+- `macjev optiq-serve` is the pinned `mlx-optiq` compatibility path for
+  DiffusionGemma image input. It currently accepts inline `data:image/...`
+  URLs only and does not accept local paths or remote image URLs.
 - `/v1/completions` and vLLM-specific thought-prefix behavior are not assumed.
 - CUDA NVFP4 and Mac `.dgq` q4 are not bitwise equivalent.
 - Softmax probabilities are not calibrated confidence.
@@ -162,7 +165,8 @@ The service fails explicitly when:
 
 - the real backend is unavailable
 - a choice exceeds the backend label limit
-- an image is supplied to the text-only Mac path
+- an image is supplied to the legacy text-only `diffgemma serve` path
+- an image source is not an inline `data:image/...` URL
 - a schema uses an unsupported question type
 - the backend response cannot be normalized
 

@@ -10,6 +10,8 @@ from __future__ import annotations
 from importlib.metadata import version
 from typing import Any, Callable, Iterable
 
+from .schema import is_data_image_url
+
 SUPPORTED_OPTIQ_VERSION = "0.5.12"
 
 _PATCHED = False
@@ -24,14 +26,25 @@ def _image_from_part(part: dict[str, Any]) -> Any:
         source = source.get("url")
     if not isinstance(source, str):
         raise TypeError(f"unsupported image source: {type(source)!r}")
-    if source.startswith("data:"):
-        import base64
-        import io
+    if not is_data_image_url(source):
+        raise ValueError("image source must be a data:image URL")
+    try:
+        _, encoded = source.split(",", 1)
+    except ValueError as exc:
+        raise ValueError("image data URL is missing a comma") from exc
 
-        return Image.open(
-            io.BytesIO(base64.b64decode(source.split(",", 1)[1]))
-        ).convert("RGB")
-    return Image.open(source).convert("RGB")
+    import base64
+    import binascii
+    import io
+
+    try:
+        payload = base64.b64decode(encoded, validate=True)
+    except (ValueError, binascii.Error) as exc:
+        raise ValueError("image data URL is not valid base64") from exc
+    try:
+        return Image.open(io.BytesIO(payload)).convert("RGB")
+    except OSError as exc:
+        raise ValueError("image data URL does not contain a supported image") from exc
 
 
 def _messages_to_prompt_and_images(

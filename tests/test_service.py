@@ -4,6 +4,7 @@ import unittest
 from unittest import mock
 
 from macjev.backends.mock import MockBackend
+from macjev.errors import SchemaError
 from macjev.schema import normalize_answers
 from macjev.service import DecisionService
 
@@ -78,6 +79,29 @@ class ServiceTests(unittest.TestCase):
             [{"url": "data:image/png;base64,AAAA"}],
         )
         self.assertEqual(schema["questions"][0]["id"], "target")
+
+    def test_rejects_malformed_image_entries(self) -> None:
+        for images in (
+            ["not-an-image-object"],
+            [{"url": ""}],
+            [{"url": "file:///etc/passwd"}],
+            [{"url": "https://example.com/image.png"}],
+        ):
+            with self.subTest(images=images):
+                with self.assertRaises(SchemaError):
+                    self.service.decide(
+                        {
+                            "model": "jev-latest",
+                            "state": "state",
+                            "images": images,
+                            "questions": {
+                                "target": {
+                                    "type": "choice",
+                                    "criteria": {"left": "Left", "right": "Right"},
+                                }
+                            },
+                        }
+                    )
 
     def test_normalizes_real_diffgemma_score_shape(self) -> None:
         result = normalize_answers(

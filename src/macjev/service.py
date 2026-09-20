@@ -6,7 +6,7 @@ from typing import Any
 
 from .backends.base import DecisionBackend
 from .errors import ModelNotFound, SchemaError, UnsupportedFeature
-from .schema import build_diffgemma_schema, normalize_answers
+from .schema import build_diffgemma_schema, is_data_image_url, normalize_answers
 
 MODEL_VERSION = "openjev-0.1"
 MODEL_ALIASES = {"openjev-latest", MODEL_VERSION, "jev-latest", "jev-preview"}
@@ -35,6 +35,21 @@ class DecisionService:
         images = request.get("images")
         if images is not None and not isinstance(images, list):
             raise SchemaError("images must be an array")
+        if images is not None:
+            for index, image in enumerate(images):
+                if not isinstance(image, dict):
+                    raise SchemaError(
+                        f"images[{index}] must be an object with a url"
+                    )
+                image_url = image.get("url")
+                if not isinstance(image_url, str) or not image_url:
+                    raise SchemaError(
+                        f"images[{index}].url must be a non-empty string"
+                    )
+                if not is_data_image_url(image_url):
+                    raise SchemaError(
+                        f"images[{index}].url must be a data:image URL"
+                    )
 
         questions = request.get("questions")
         options = request.get("options")

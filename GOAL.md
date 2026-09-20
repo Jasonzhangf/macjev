@@ -45,9 +45,10 @@ Jev-compatible service.
 - The backend interface must remain swappable.
 - A mock backend is allowed only for protocol tests and must be selected
   explicitly.
-- The Mac backend must use the local `diffgemma` HTTP server.
-- Unsupported image input must fail explicitly until the Metal vision path is
-  available.
+- The legacy Mac backend uses the local `diffgemma` HTTP server.
+- Image input uses the pinned `macjev optiq-serve` `mlx-optiq` compatibility
+  path and inline `data:image/...` sources. Unsupported image sources must fail
+  explicitly.
 - Choice cardinality must fail explicitly above the backend limit.
 - Model output, timing, and calibration evidence must identify the backend,
   model, revision, and quantization.

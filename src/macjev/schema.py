@@ -20,6 +20,12 @@ ALLOWED_OPTIONS = {
 }
 
 
+def is_data_image_url(value: Any) -> bool:
+    """Return whether ``value`` is an inline data URL for an image."""
+
+    return isinstance(value, str) and value.startswith("data:image/")
+
+
 def _require_mapping(value: Any, label: str) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise SchemaError(f"{label} must be an object")
