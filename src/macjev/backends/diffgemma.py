@@ -55,17 +55,28 @@ class DiffGemmaBackend:
                 f"diffgemma does not advertise configured model {self.model!r}"
             )
 
-    def decide(self, state: Any, schema: dict[str, Any]) -> dict[str, Any]:
+    def decide(
+        self,
+        state: Any,
+        schema: dict[str, Any],
+        images: list[dict[str, Any]] | None = None,
+    ) -> dict[str, Any]:
         if self.schema_options:
             schema = dict(schema)
             schema.update(self.schema_options)
+        user_content: Any = json.dumps({"state": state}, ensure_ascii=False)
+        if images:
+            user_content = [{"type": "text", "text": user_content}]
+            user_content.extend(
+                {"type": "image_url", "image_url": image} for image in images
+            )
         body = {
             "model": self.model,
             "messages": [
                 {"role": "system", "content": json.dumps(schema, ensure_ascii=False)},
                 {
                     "role": "user",
-                    "content": json.dumps({"state": state}, ensure_ascii=False),
+                    "content": user_content,
                 },
             ],
             "stream": False,

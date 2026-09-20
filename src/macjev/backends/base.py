@@ -10,5 +10,10 @@ class DecisionBackend(Protocol):
 
     name: str
 
-    def decide(self, state: Any, schema: dict[str, Any]) -> dict[str, Any]:
+    def decide(
+        self,
+        state: Any,
+        schema: dict[str, Any],
+        images: list[dict[str, Any]] | None = None,
+    ) -> dict[str, Any]:
         """Return an answers object plus optional diagnostics."""

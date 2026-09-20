@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import subprocess
 import sys
+from pathlib import Path
 from typing import Sequence
 
 from .backends.diffgemma import DiffGemmaBackend
@@ -18,6 +21,19 @@ from .errors import ConfigError, DaemonError, MacJevError
 from .http import serve
 from .service import DecisionService
 from .supervisor import RuntimeSupervisor
+
+
+class _RemainderArgs(argparse.Action):
+    """Keep forwarded args without argparse's leading ``--`` sentinel."""
+
+    def __call__(
+        self,
+        parser: argparse.ArgumentParser,
+        namespace: argparse.Namespace,
+        values: Sequence[str],
+        option_string: str | None = None,
+    ) -> None:
+        setattr(namespace, self.dest, list(values[1:] if values[:1] == ["--"] else values))
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -48,6 +64,21 @@ def _build_parser() -> argparse.ArgumentParser:
         "--no-daemon",
         action="store_true",
         help="do not start the managed model daemon",
+    )
+
+    optiq_parser = subparsers.add_parser(
+        "optiq-serve",
+        help="start mlx-optiq with the MacJev DiffusionGemma vision compatibility",
+    )
+    optiq_parser.add_argument("--python", required=True)
+    optiq_parser.add_argument("--model", required=True)
+    optiq_parser.add_argument("--host", default="127.0.0.1")
+    optiq_parser.add_argument("--port", type=int, default=8080)
+    optiq_parser.add_argument(
+        "extra_args",
+        nargs=argparse.REMAINDER,
+        action=_RemainderArgs,
+        default=[],
     )
     return parser
 
@@ -123,6 +154,33 @@ def _serve(args: argparse.Namespace) -> int:
     return 0
 
 
+def _optiq_serve(args: argparse.Namespace) -> int:
+    env = os.environ.copy()
+    source_root = str(Path(__file__).resolve().parents[1])
+    existing = env.get("PYTHONPATH")
+    env["PYTHONPATH"] = os.pathsep.join(
+        part for part in (source_root, existing) if part
+    )
+    command = [
+        args.python,
+        "-m",
+        "macjev.optiq_serve",
+        "serve",
+        "--model",
+        args.model,
+        "--host",
+        args.host,
+        "--port",
+        str(args.port),
+        *args.extra_args,
+    ]
+    try:
+        completed = subprocess.run(command, env=env)
+    except KeyboardInterrupt:
+        return 130
+    return completed.returncode
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
@@ -133,6 +191,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             return _daemon(args)
         if args.command == "serve":
             return _serve(args)
+        if args.command == "optiq-serve":
+            return _optiq_serve(args)
     except (ConfigError, DaemonError, MacJevError) as exc:
         print(f"macjev: error: {exc}", file=sys.stderr)
         return 2

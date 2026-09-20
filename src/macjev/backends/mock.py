@@ -13,7 +13,12 @@ class MockBackend:
 
     name = "mock"
 
-    def decide(self, state: Any, schema: dict[str, Any]) -> dict[str, Any]:
+    def decide(
+        self,
+        state: Any,
+        schema: dict[str, Any],
+        images: list[dict[str, Any]] | None = None,
+    ) -> dict[str, Any]:
         answers: dict[str, Any] = {}
         state_text = (
             state

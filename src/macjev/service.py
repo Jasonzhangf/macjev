@@ -29,19 +29,17 @@ class DecisionService:
                 f"model {model!r} is not available; use one of: "
                 f"{', '.join(sorted(MODEL_ALIASES))}"
             )
-        if request.get("images"):
-            raise UnsupportedFeature(
-                "the Mac diffgemma backend is text-only; image input is not supported"
-            )
-
         if "state" not in request:
             raise SchemaError("state is required")
         state = request["state"]
+        images = request.get("images")
+        if images is not None and not isinstance(images, list):
+            raise SchemaError("images must be an array")
 
         questions = request.get("questions")
         options = request.get("options")
         schema = build_diffgemma_schema(questions, options)
-        backend_response = self.backend.decide(state, schema)
+        backend_response = self.backend.decide(state, schema, images=images)
         answers = normalize_answers(questions, backend_response)
         diagnostics = backend_response.get("diagnostics", {})
         prompt_tokens = diagnostics.get("timing", {}).get("prompt_tokens")

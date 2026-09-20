@@ -25,7 +25,12 @@ class CountingBackend(DecisionBackend):
     def __init__(self) -> None:
         self.calls = 0
 
-    def decide(self, state: object, schema: dict) -> dict:
+    def decide(
+        self,
+        state: object,
+        schema: dict,
+        images: list[dict] | None = None,
+    ) -> dict:
         self.calls += 1
         answer = {
             "type": "choice",

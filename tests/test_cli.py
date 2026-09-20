@@ -6,11 +6,86 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from macjev.cli import _serve
+from macjev.cli import _build_parser, _optiq_serve, _serve
 from macjev.errors import BackendError, DaemonError
 
 
 class CliServeTests(unittest.TestCase):
+    def test_optiq_serve_builds_python_launcher_command(self) -> None:
+        args = _build_parser().parse_args(
+            [
+                "optiq-serve",
+                "--python",
+                "/tmp/optiq/bin/python",
+                "--model",
+                "/tmp/model",
+                "--host",
+                "127.0.0.1",
+                "--port",
+                "18092",
+                "--",
+                "--max-context",
+                "32768",
+            ]
+        )
+
+        self.assertEqual(args.command, "optiq-serve")
+        self.assertEqual(args.python, "/tmp/optiq/bin/python")
+        self.assertEqual(args.model, "/tmp/model")
+        self.assertEqual(args.extra_args, ["--max-context", "32768"])
+
+    def test_optiq_serve_runs_launcher_with_source_on_pythonpath(self) -> None:
+        args = argparse.Namespace(
+            python="/tmp/optiq/bin/python",
+            model="/tmp/model",
+            host="127.0.0.1",
+            port=18092,
+            extra_args=["--max-context", "32768"],
+        )
+
+        with mock.patch("macjev.cli.subprocess.run") as run:
+            run.return_value.returncode = 0
+            self.assertEqual(_optiq_serve(args), 0)
+
+        command = run.call_args.args[0]
+        self.assertEqual(
+            command,
+            [
+                "/tmp/optiq/bin/python",
+                "-m",
+                "macjev.optiq_serve",
+                "serve",
+                "--model",
+                "/tmp/model",
+                "--host",
+                "127.0.0.1",
+                "--port",
+                "18092",
+                "--max-context",
+                "32768",
+            ],
+        )
+        source_root = str(Path(__file__).resolve().parents[1] / "src")
+        self.assertEqual(
+            run.call_args.kwargs["env"]["PYTHONPATH"].split(":", 1)[0],
+            source_root,
+        )
+
+    def test_optiq_serve_reports_interrupt_without_traceback(self) -> None:
+        args = argparse.Namespace(
+            python="/tmp/optiq/bin/python",
+            model="/tmp/model",
+            host="127.0.0.1",
+            port=18092,
+            extra_args=[],
+        )
+
+        with mock.patch(
+            "macjev.cli.subprocess.run",
+            side_effect=KeyboardInterrupt,
+        ):
+            self.assertEqual(_optiq_serve(args), 130)
+
     def test_health_failure_stops_daemon_started_by_this_call(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

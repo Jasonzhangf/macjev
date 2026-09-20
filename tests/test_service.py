@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import unittest
+from unittest import mock
 
 from macjev.backends.mock import MockBackend
-from macjev.errors import UnsupportedFeature
 from macjev.schema import normalize_answers
 from macjev.service import DecisionService
 
@@ -41,16 +41,43 @@ class ServiceTests(unittest.TestCase):
         self.assertEqual(result["model"], "openjev-0.1")
         self.assertIn("usage", result)
 
-    def test_rejects_images(self) -> None:
-        with self.assertRaises(UnsupportedFeature):
-            self.service.decide(
-                {
-                    "model": "jev-latest",
-                    "state": "state",
-                    "images": [{"url": "https://example.invalid/image.png"}],
-                    "questions": {"urgent": {"type": "noul"}},
+    def test_passes_images_to_the_backend(self) -> None:
+        backend = mock.Mock()
+        backend.name = "test-backend"
+        backend.decide.return_value = {
+            "answers": {
+                "target": {
+                    "probabilities": {"left": 0.8, "right": 0.2},
                 }
-            )
+            },
+            "diagnostics": {},
+        }
+        service = DecisionService(backend)
+
+        service.decide(
+            {
+                "model": "jev-latest",
+                "state": {"viewport": {"width": 1280, "height": 720}},
+                "images": [{"url": "data:image/png;base64,AAAA"}],
+                "questions": {
+                    "target": {
+                        "type": "choice",
+                        "criteria": {"left": "Left", "right": "Right"},
+                    }
+                },
+            }
+        )
+
+        backend.decide.assert_called_once()
+        state, schema = backend.decide.call_args.args
+        self.assertEqual(
+            state, {"viewport": {"width": 1280, "height": 720}}
+        )
+        self.assertEqual(
+            backend.decide.call_args.kwargs["images"],
+            [{"url": "data:image/png;base64,AAAA"}],
+        )
+        self.assertEqual(schema["questions"][0]["id"], "target")
 
     def test_normalizes_real_diffgemma_score_shape(self) -> None:
         result = normalize_answers(
