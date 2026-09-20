@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import tomllib
+import math
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -100,6 +101,8 @@ def _number(
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise ConfigError(f"{key} must be numeric")
     value = float(value)
+    if not math.isfinite(value):
+        raise ConfigError(f"{key} must be finite")
     if value < minimum:
         raise ConfigError(f"{key} must be >= {minimum}")
     return value
