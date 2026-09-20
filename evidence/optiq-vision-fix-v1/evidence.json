@@ -1,0 +1,43 @@
+{
+  "candidate_commit": "12df182a420ee62f83d991fb247b6b72c6e045de",
+  "base_commit": "93ff1223c4257023843d732854d7b780d7a5487a",
+  "python": "3.14.6 (main, Jun 10 2026, 10:03:53) [Clang 21.0.0 (clang-2100.0.123.102)]",
+  "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+  "declared_regression": {
+    "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src:. python3 -m unittest discover -s tests -v",
+    "exit_code": 0,
+    "tests_run": 79,
+    "result": "OK",
+    "log_sha256": "93f7ad7dc5c966d6d8e46b1597c83ef931eb9cc94511adcc4dfee4beba3c8354",
+    "log_tail": [
+      "macjev: 127.0.0.1 \"POST /v1/systemone HTTP/1.1\" 200 -",
+      "macjev: 127.0.0.1 \"POST /v1/systemone HTTP/1.1\" 200 -",
+      "macjev: 127.0.0.1 \"POST /v1/systemone HTTP/1.1\" 200 -",
+      "macjev: 127.0.0.1 \"GET /health HTTP/1.1\" 200 -",
+      "macjev: 127.0.0.1 \"GET /v1/models HTTP/1.1\" 200 -",
+      "macjev: 127.0.0.1 \"POST /v1/systemone HTTP/1.1\" 422 -",
+      "macjev: 127.0.0.1 \"POST /v1/systemone HTTP/1.1\" 200 -",
+      "macjev: 127.0.0.1 \"POST /v1/systemone HTTP/1.1\" 404 -"
+    ]
+  },
+  "real_optiq_image_replay": {
+    "entrypoint": "macjev optiq-serve",
+    "mlx_optiq_version": "0.5.12",
+    "model": "/Volumes/extension/code/macjev/model/diffusiongemma-26b-a4b-it-optiq4-mlx",
+    "prompt": "Which button is labeled SUBMIT?",
+    "image": "playground/webauto-v3-playground/webauto-v3/capability-tests/images/three-buttons.png",
+    "response_content": "thought\nSUBMIT",
+    "usage": {
+      "prompt_tokens": 290,
+      "completion_tokens": 7,
+      "total_tokens": 297,
+      "prompt_tokens_details": {
+        "cached_tokens": 0
+      },
+      "completion_tokens_details": {
+        "reasoning_tokens": 0
+      }
+    },
+    "response_sha256": "7744560b90fc89824d8eecfa50090f339cbc0f438f82472c4b38909d99657ec7"
+  }
+}
