@@ -166,11 +166,6 @@ def patch_diffusion_vision_serving() -> None:
                 max_tokens=max_tokens,
                 temperature=temperature,
             )
-            import mlx.core as mx
-
-            vocab_size = model.config.text_config.vocab_size
-            logprobs = mx.zeros((vocab_size,), dtype=mx.float32)
-
             def update_usage(prompt_tokens: int) -> None:
                 if context is not None:
                     context.prompt = [0] * int(prompt_tokens)
@@ -180,7 +175,7 @@ def patch_diffusion_vision_serving() -> None:
                 results,
                 tokenizer,
                 update_usage,
-                logprobs=logprobs,
+                logprobs=serve._NULL_LOGPROBS,
             )
 
         server_mod.stream_generate = stream_generate

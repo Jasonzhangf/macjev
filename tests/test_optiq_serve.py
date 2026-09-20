@@ -154,6 +154,8 @@ class OptiqServeTests(unittest.TestCase):
 
         serve = types.ModuleType("optiq.serve")
         serve._PENDING_VLM = {}
+        null_logprobs = object()
+        serve._NULL_LOGPROBS = null_logprobs
         serve.install_diffusion_serving = lambda: calls.setdefault(
             "diffusion_install", True
         )
@@ -241,6 +243,7 @@ class OptiqServeTests(unittest.TestCase):
         self.assertEqual(len(calls["native_stream_generate"][1]["images"]), 1)
         self.assertEqual(calls["native_stream_generate"][1]["max_tokens"], 4)
         self.assertEqual(calls["native_stream_generate"][1]["temperature"], 0.1)
+        self.assertIs(responses[0].logprobs, null_logprobs)
 
 
 if __name__ == "__main__":
