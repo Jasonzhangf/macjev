@@ -6,6 +6,11 @@ __pycache__/
 model/
 runs/
 *.log
+.agent-collab/
+.claude/
+.codex/
+.curl-home/
+.mcp.json
 
 # BEGIN APPSDK MANAGED
 .appsdk-control/

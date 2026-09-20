@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "modules": [{
+    "module_id": "macjev-governance",
+    "status": "active",
+    "owner": "macjev-governance",
+    "owned_paths": [
+      ".appsdk/**",
+      "contracts/**",
+      "AGENTS.md",
+      "docs/**",
+      "memory/**",
+      "src/**",
+      "evaluation/**",
+      "playground/**",
+      "tests/**",
+      "scripts/**",
+      "pyproject.toml",
+      "README.md",
+      "GOAL.md",
+      "PLAN.md",
+      ".gitignore"
+    ],
+    "forbidden_paths": ["active/lib/**", "protected/**", "generated/**"],
+    "verification_gates": ["fix_lifecycle_graph", "mainline_merge_identity"]
+  }]
+}

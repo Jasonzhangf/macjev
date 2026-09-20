@@ -1,0 +1,27 @@
+{
+  "goal_id": "goal-macjev-appsdk-governance",
+  "raw_request": "Register MacJev with current AppSDK governance and Collab coordination while preserving the Mac-native DiffusionGemma runtime, evaluation evidence, and Jev API contract.",
+  "understood_objective": "Bind MacJev project identity, ownership, and verification boundaries to AppSDK 0.1.7 so the existing Mac-native runtime and evidence can be developed and delivered under one governed project.",
+  "acceptance_criteria": [
+    "AppSDK 0.1.7 verifies the MacJev project contract and canonical record contracts.",
+    "The Jev HTTP contract, DiffusionGemma backend, runtime supervisor, and evaluation evidence remain the implementation truth.",
+    "Project governance paths are owned by macjev-governance and do not enter model request or response payloads.",
+    "Existing tests continue to pass after governance binding."
+  ],
+  "non_goals": [
+    "Do not retrain DiffusionGemma or implement RLCD.",
+    "Do not change the Jev request or response protocol.",
+    "Do not connect the model service to RouteCodex control state.",
+    "Do not treat draft WebAuto v3 design as approved runtime behavior."
+  ],
+  "assumptions": [
+    "MacJev remains a local Mac project until a remote repository is explicitly provided.",
+    "The installed AppSDK 0.1.7 binary and its embedded canonical contracts are the governance truth."
+  ],
+  "ambiguities": [],
+  "questions": [],
+  "status": "confirmed",
+  "confirmed_by": "Jason",
+  "confirmed_at": "2026-09-19T00:00:00-07:00",
+  "created_at": "2026-09-19T00:00:00-07:00"
+}

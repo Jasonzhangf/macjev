@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "preparation_id": "prepare-macjev-governance-20260919",
+  "status": "confirmed",
+  "objective": "Register the existing MacJev repository with the current AppSDK governance contract and Collab coordination while preserving all model, download, runtime evidence, and existing experiment state.",
+  "change_kind": "new_project",
+  "project_root": ".",
+  "legacy_roots": [],
+  "new_roots": [".appsdk/**", ".appsdk-control/**", ".agent-collab/**", "contracts/**", "docs/**", "memory/**"],
+  "protected_roots": [".git/**", "model/**", "runs/**", ".curl-home/**", "playground/m2-structured-protocol-20260919/**"],
+  "runtime_forbidden_roots": ["generated/**", ".agent-collab/**"],
+  "boundary": {
+    "allowed_paths": [".appsdk-prepare.json", ".appsdk/**", ".appsdk-control/**", ".agent-collab/**", ".gitignore", "AGENTS.md", "contracts/**", "docs/**", "memory/**"],
+    "forbidden_paths": [".git/**", "model/**", "runs/**", ".curl-home/**", "playground/m2-structured-protocol-20260919/**", "PLAN.md"],
+    "payload_control_separation": "confirmed: AppSDK and Collab control state never enters Jev request, response, model, or backend payloads"
+  },
+  "acceptance_criteria": [
+    "appsdk init completes without replacing existing project files",
+    "collab context reports a live registered peer for the MacJev project",
+    "the user-authorized peer is promoted to the MacJev Collab master when no live master exists",
+    "existing model files, download state, M2 evidence, and PLAN.md remain unchanged"
+  ],
+  "non_goals": [
+    "Do not reset or migrate any prior AppSDK or Collab control plane",
+    "Do not modify model weights, download configuration, runtime evidence, or M2 experiment files",
+    "Do not put governance state into the Jev protocol or DiffGemma backend payload"
+  ],
+  "assumptions": [
+    "MacJev has no prior AppSDK project contract or Collab project identity",
+    "The user's explicit request to register Collab master authorizes this project governance initialization and role promotion"
+  ],
+  "questions": [],
+  "confirmed_by": "Jason (explicit request to register Collab master and upgrade AppSDK)",
+  "confirmed_at": "2026-09-19T00:00:00-07:00",
+  "created_at": "2026-01-01T00:00:00Z"
+}
