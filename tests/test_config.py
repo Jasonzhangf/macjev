@@ -57,6 +57,37 @@ log_dir = "log"
             with self.assertRaisesRegex(ConfigError, "backend.type"):
                 load_config(path)
 
+    def test_rejects_non_finite_numeric_values(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "config.toml"
+            for value in ("nan", "inf", "-inf"):
+                with self.subTest(value=value):
+                    path.write_text(
+                        f"""
+[server]
+host = "127.0.0.1"
+port = 8091
+
+[backend]
+type = "diffgemma"
+base_url = "http://127.0.0.1:8080"
+model = "model"
+timeout_seconds = {value}
+
+[daemon]
+managed = false
+
+[paths]
+run_dir = "run"
+log_dir = "log"
+""",
+                        encoding="utf-8",
+                    )
+                    with self.assertRaisesRegex(
+                        ConfigError, "timeout_seconds must be finite"
+                    ):
+                        load_config(path)
+
     def test_rejects_managed_https_backend(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
