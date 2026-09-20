@@ -1,15 +1,4 @@
 {
-  "schema_version": 1,
-  "project_id": "macjev",
-  "sdk": {
-    "name": "appsdk",
-    "version": "0.1.7",
-    "bundle_manifest": ".appsdk/contracts/sdk-bundle.manifest.json",
-    "resource_record": ".appsdk/sdk-resources.json"
-  },
-  "lifecycle": {
-    "stage": "draft"
-  },
   "access": {
     "protected_paths": [
       ".appsdk/**",
@@ -18,45 +7,13 @@
     ]
   },
   "development_scenarios": {
-    "manifest": ".appsdk/contracts/development-scenarios.manifest.json",
-    "enabled": []
-  },
-  "guidance": {
-    "enforcement": "advisory",
-    "compiled_manifest": ".appsdk/guidance/compiled.json",
-    "rule_sources": [
-      {
-        "source_id": "project-agents",
-        "kind": "agents",
-        "path": "AGENTS.md",
-        "required": false,
-        "precedence": 100
-      },
-      {
-        "source_id": "appsdk-governance-skill",
-        "kind": "skill",
-        "path": ".appsdk/skills/appsdk-project-governance/SKILL.md",
-        "contract_path": ".appsdk/skills/appsdk-project-governance/appsdk-guidance.json",
-        "required": true,
-        "precedence": 200
-      }
-    ]
+    "enabled": [],
+    "manifest": ".appsdk/contracts/development-scenarios.manifest.json"
   },
   "governance": {
-    "playground_root": "playground/**",
-    "active_root": "active/lib/**",
-    "protected_root": "protected/**",
-    "generated_root": "generated/**",
     "active_kind": "immutable_consumable_library",
-    "protected_kinds": [
-      "source",
-      "contracts",
-      "history"
-    ],
-    "generated_kinds": [
-      "compiler_output",
-      "indexes"
-    ],
+    "active_root": "active/lib/**",
+    "debug_merge_comment_required": true,
     "freeze_requirements": [
       "git_clean",
       "source_commit_or_tag",
@@ -65,16 +22,25 @@
       "review_pass",
       "previous_active_immutable"
     ],
+    "generated_kinds": [
+      "compiler_output",
+      "indexes"
+    ],
+    "generated_root": "generated/**",
+    "playground_retention": "archive_then_remove",
+    "playground_root": "playground/**",
     "promotion_requires": [
       "experiment_evidence",
       "architecture_review_pass",
       "unique_owner",
       "required_gates"
     ],
-    "runtime_forbidden_roots": [
-      "playground/**",
-      "generated/**"
+    "protected_kinds": [
+      "source",
+      "contracts",
+      "history"
     ],
+    "protected_root": "protected/**",
     "record_contracts": [
       "contracts/records/worktree-record.schema.json",
       "contracts/records/reproduction-record.schema.json",
@@ -97,20 +63,68 @@
       "contracts/records/freeze-record.schema.json",
       "contracts/records/record-graph.contract.json"
     ],
-    "zone_transition_contract": "contracts/transitions/zone-transition.manifest.json",
-    "playground_retention": "archive_then_remove",
-    "debug_merge_comment_required": true
+    "runtime_forbidden_roots": [
+      "playground/**",
+      "generated/**"
+    ],
+    "zone_transition_contract": "contracts/transitions/zone-transition.manifest.json"
+  },
+  "guidance": {
+    "compiled_manifest": ".appsdk/guidance/compiled.json",
+    "enforcement": "advisory",
+    "rule_sources": [
+      {
+        "kind": "agents",
+        "path": "AGENTS.md",
+        "precedence": 100,
+        "required": false,
+        "source_id": "project-agents"
+      },
+      {
+        "contract_path": ".appsdk/skills/appsdk-project-governance/appsdk-guidance.json",
+        "kind": "skill",
+        "path": ".appsdk/skills/appsdk-project-governance/SKILL.md",
+        "precedence": 200,
+        "required": true,
+        "source_id": "appsdk-governance-skill"
+      }
+    ]
+  },
+  "lifecycle": {
+    "stage": "draft"
   },
   "lifecycles": {
+    "artifact": "generated",
     "issue": "open",
     "library": "draft",
-    "source_snapshot": "mutable",
-    "artifact": "generated"
+    "source_snapshot": "mutable"
   },
   "modules": [
     {
+      "active_artifact": "active/lib/macjev-governance/**",
+      "artifact_paths": [
+        "macjev-governance.contract.json"
+      ],
+      "build": {
+        "args": [
+          "-c",
+          "mkdir -p generated/modules/macjev-governance/lib && printf 'macjev governance contract bundle\\n' > generated/modules/macjev-governance/lib/macjev-governance.contract.json"
+        ],
+        "program": "sh",
+        "working_directory": "."
+      },
+      "contract_paths": [
+        ".appsdk/**",
+        "contracts/**",
+        "AGENTS.md",
+        "docs/**",
+        "memory/**"
+      ],
+      "dependency_modules": [],
+      "generated_outputs": [
+        "generated/modules/macjev-governance/**"
+      ],
       "module_id": "macjev-governance",
-      "stage": "contract_bound",
       "owned_paths": [
         ".appsdk/**",
         "contracts/**",
@@ -128,39 +142,14 @@
         "PLAN.md",
         ".gitignore"
       ],
-      "source_owner": "macjev-governance",
-      "active_artifact": "active/lib/macjev-governance/**",
-      "generated_outputs": [
-        "generated/modules/macjev-governance/**"
-      ],
-      "contract_paths": [
-        ".appsdk/**",
-        "contracts/**",
-        "AGENTS.md",
-        "docs/**",
-        "memory/**"
-      ],
-      "dependency_modules": [],
-      "build": {
-        "program": "sh",
-        "args": [
-          "-c",
-          "mkdir -p generated/modules/macjev-governance/lib && printf 'macjev governance contract bundle\\n' > generated/modules/macjev-governance/lib/macjev-governance.contract.json"
-        ],
-        "working_directory": "."
-      },
-      "artifact_paths": [
-        "macjev-governance.contract.json"
-      ],
       "regression": {
-        "required_before_freeze": true,
-        "suite_id": "macjev-governance-regression",
+        "allow_skipped": false,
         "command": {
-          "program": "sh",
           "args": [
             "-c",
             "PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src:. python3 -m unittest discover -s tests -v"
           ],
+          "program": "sh",
           "working_directory": "."
         },
         "input_paths": [
@@ -180,7 +169,6 @@
           "PLAN.md"
         ],
         "minimum_test_count": 68,
-        "allow_skipped": false,
         "ordinary_mode_after_freeze": "disabled",
         "reenable_on": [
           "source_change",
@@ -188,8 +176,20 @@
           "public_api_change",
           "artifact_change",
           "dependency_change"
-        ]
-      }
+        ],
+        "required_before_freeze": true,
+        "suite_id": "macjev-governance-regression"
+      },
+      "source_owner": "macjev-governance",
+      "stage": "contract_bound"
     }
-  ]
+  ],
+  "project_id": "macjev",
+  "schema_version": 1,
+  "sdk": {
+    "bundle_manifest": ".appsdk/contracts/sdk-bundle.manifest.json",
+    "name": "appsdk",
+    "resource_record": ".appsdk/sdk-resources.json",
+    "version": "0.1.7"
+  }
 }
