@@ -39,5 +39,14 @@
       }
     },
     "response_sha256": "7744560b90fc89824d8eecfa50090f339cbc0f438f82472c4b38909d99657ec7"
+  },
+  "main_replay": {
+    "main_commit": "d495ea6acf38d0eddbb586eb5ed33fc3cadb8266",
+    "declared_regression_exit_code": 0,
+    "declared_regression_tests_run": 79,
+    "declared_regression_result": "OK",
+    "declared_regression_log_sha256": "c965ee5c590fd5344c4c10af6dcaa350bd50d8d027e45d550ef6153bb2e89545",
+    "image_response_content": "thought\nSUBMIT",
+    "image_response_sha256": "928fe9bd6a6025260fe6e430c6cf490f545bcf10797f84f9fcec1104192887b3"
   }
 }
