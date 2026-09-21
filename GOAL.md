@@ -28,8 +28,7 @@ It must return:
 - entropy or equivalent uncertainty diagnostics
 - stable question IDs and candidate order
 
-The first target is a runnable playground. The later target is a formal
-Jev-compatible service.
+The first target is a runnable Jev-compatible service.
 
 ## Non-Goals
 
@@ -55,7 +54,7 @@ Jev-compatible service.
 
 ## Acceptance Evidence
 
-The playground is complete when:
+The service milestone is complete when:
 
 1. The mock backend passes end-to-end HTTP tests.
 2. A real local `diffgemma` server can be probed without changing the Jev

@@ -2,10 +2,12 @@
 
 ## Current Status
 
-Status: M1 playground implemented; M2 model download in progress.
+Status: M0-M3 and M5 implemented; M4 evaluation evidence recorded for the
+current local scope.
 
-The objective is fixed in `GOAL.md`. The project is intentionally starting as
-an experiment under `playground/` before the formal service is extracted.
+The objective is fixed in `GOAL.md`. The current implementation is the
+production service under `src/macjev/`, exposed through `macjev.cli` and
+`scripts/macjev-server`.
 
 ## M0: Goal and Architecture Lock
 
@@ -23,9 +25,9 @@ Exit criteria:
 - every later change can be classified as API, adapter, backend, or calibration
   work
 
-## M1: Runnable Playground
+## M1: Runnable Jev-Compatible Service
 
-Status: complete for mock protocol mode.
+Status: complete.
 
 Deliverables:
 
@@ -34,14 +36,13 @@ Deliverables:
 - real `diffgemma` HTTP client
 - schema conversion
 - result normalization
-- example request
+- example request in `fixtures/example_request.json`
 - end-to-end mock test
 
 Exit criteria:
 
-- `PYTHONPATH=src python -m playground.run_mock` serves `/health`,
-  `/v1/models`, and
-  `/v1/systemone`
+- the production `macjev serve` path and its HTTP handler serve `/health`,
+  `/v1/models`, and `/v1/systemone`
 - `PYTHONPATH=src python -m unittest discover -s tests -v` passes
 
 Evidence:
@@ -52,7 +53,7 @@ Evidence:
 
 ## M2: Real Mac Metal Probe
 
-Status: in progress.
+Status: complete for the pinned local model path.
 
 Deliverables:
 
@@ -73,11 +74,11 @@ Current evidence:
 
 - `diffgemma` 0.1.0 was built and installed from commit `6f6c825d`.
 - The pinned q4 pack revision is `be312db884e99c963518a5e5a97de6080263f2a8`.
-- The official downloader is resuming the 19 GiB pack.
+- The managed daemon downloads the pinned 19 GiB pack when it is missing.
 
 ## M3: Jev Contract Compatibility
 
-Status: pending.
+Status: complete.
 
 Deliverables:
 
@@ -93,12 +94,12 @@ Deliverables:
 
 Exit criteria:
 
-- TypeSafe SDK or equivalent client can call the playground without a custom
+- TypeSafe SDK or equivalent client can call the service without a custom
   transport
 
 ## M4: Evaluation Before Calibration
 
-Status: pending.
+Status: complete for the recorded local fixtures and evidence.
 
 Deliverables:
 
@@ -121,7 +122,7 @@ Exit criteria:
 
 ## M5: Formal Implementation
 
-Status: production skeleton implemented.
+Status: production runtime implemented.
 
 Deliverables:
 
@@ -147,8 +148,8 @@ Exit criteria:
 
 ## Immediate Tasks
 
-1. Finish the playground server and tests.
-2. Run the mock end-to-end path.
-3. Build `diffgemma` on this Mac.
-4. Download the q4 pack.
-5. Probe the real backend and record the first evidence.
+1. Keep the production runtime and release gates green.
+2. Implement the browser guard/repair server contract.
+3. Implement the vision/computer-use server contract.
+4. Add live browser and computer-use adapters only after their bounded
+   capability probes are stable.
