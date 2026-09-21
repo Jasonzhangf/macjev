@@ -2,8 +2,7 @@
 
 ## Current Status
 
-Status: M0-M3 and M5 implemented; M4 evaluation evidence recorded for the
-current local scope.
+Status: M0-M3 and M5 implemented; M4 evaluation evidence is partial.
 
 The objective is fixed in `GOAL.md`. The current implementation is the
 production service under `src/macjev/`, exposed through `macjev.cli` and
@@ -47,8 +46,8 @@ Exit criteria:
 
 Evidence:
 
-- 7 unit tests pass.
-- `/health`, `/v1/models`, and `/v1/systemone` were exercised over HTTP.
+- The current declared regression command passes with 103 tests.
+- `/health`, `/v1/models`, and `/v1/systemone` are exercised over HTTP.
 - The mock result is explicitly marked `is_mock=true`; it is not model evidence.
 
 ## M2: Real Mac Metal Probe
@@ -99,7 +98,10 @@ Exit criteria:
 
 ## M4: Evaluation Before Calibration
 
-Status: complete for the recorded local fixtures and evidence.
+Status: partial. The recorded fixtures cover accuracy, NLL, Brier, ECE, AURC,
+coverage-risk, option-order sensitivity, p50/p95 latency, prefill/denoise
+timing, wall-clock throughput, and concurrency 1/2/4. P90/P99 latency and
+explicit TTFT/process-startup measurements are not recorded.
 
 Deliverables:
 
