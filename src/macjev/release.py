@@ -180,7 +180,7 @@ def _effective_build_source(
 
     _require_release_mutation(root)
     metadata_blob = _run(
-        ["git", "hash-object", "pyproject.toml"],
+        ["git", "hash-object", "-w", "pyproject.toml"],
         cwd=root,
     ).stdout.strip()
     with tempfile.TemporaryDirectory() as temporary:

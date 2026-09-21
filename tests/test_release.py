@@ -157,7 +157,7 @@ class ReleaseTests(unittest.TestCase):
             base = {"commit": "base-commit", "tree": "base-tree"}
             outputs = {
                 ("git", "status", "--porcelain=v1", "--untracked-files=all"): " M pyproject.toml\n",
-                ("git", "hash-object", "pyproject.toml"): "metadata-blob\n",
+                ("git", "hash-object", "-w", "pyproject.toml"): "metadata-blob\n",
                 ("git", "read-tree", "HEAD"): "",
                 (
                     "git",
