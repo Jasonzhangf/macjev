@@ -1,4 +1,4 @@
-"""Small stdlib HTTP server for the MacJev playground."""
+"""Small stdlib HTTP server for the MacJev service."""
 
 from __future__ import annotations
 
@@ -30,7 +30,7 @@ def _json_bytes(value: Any) -> bytes:
 
 
 class MacJevHandler(BaseHTTPRequestHandler):
-    """Expose the minimal Jev-compatible playground API."""
+    """Expose the minimal Jev-compatible MacJev API."""
 
     service: DecisionService
     api_key = ""

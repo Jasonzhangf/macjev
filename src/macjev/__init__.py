@@ -1,4 +1,4 @@
-"""MacJev playground package."""
+"""MacJev runtime package."""
 
 from .service import DecisionService
 

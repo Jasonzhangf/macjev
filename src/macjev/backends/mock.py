@@ -9,7 +9,7 @@ from ..schema import confidence
 
 
 class MockBackend:
-    """Small deterministic backend used only by the playground."""
+    """Small deterministic backend used only by protocol tests."""
 
     name = "mock"
 

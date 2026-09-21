@@ -17,8 +17,7 @@ contracts.
   the positioning and roadmap.
 - Active implementation and production entrypoints: `src/macjev/` owns the
   service, configuration, HTTP boundary, and managed daemon lifecycle;
-  `scripts/macjev-server` and `macjev.cli` are the production entries;
-  `playground/` contains experimental and evaluation entrypoints.
+  `scripts/macjev-server` and `macjev.cli` are the production entries.
 - Compatibility and legacy boundaries: the CUDA/vLLM OpenJev implementation is
   the compatibility reference, not a runtime dependency. `diffgemma` is the
   only real inference backend. The explicit mock backend is limited to protocol

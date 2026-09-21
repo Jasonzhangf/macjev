@@ -2,11 +2,7 @@ from __future__ import annotations
 
 import json
 import os
-import socket
-import subprocess
-import sys
 import threading
-import time
 import unittest
 import urllib.error
 import urllib.request
@@ -143,7 +139,7 @@ class HttpTests(unittest.TestCase):
     def test_documented_example_request_is_valid(self) -> None:
         example = json.loads(
             Path(__file__).parents[1]
-            .joinpath("playground", "example_request.json")
+            .joinpath("fixtures", "example_request.json")
             .read_text(encoding="utf-8")
         )
         request = urllib.request.Request(
@@ -257,99 +253,6 @@ class AuthHttpTests(unittest.TestCase):
             result = json.load(response)
 
         self.assertEqual(result["model"], "openjev-0.1")
-
-
-class PlaygroundEntrypointAuthTests(unittest.TestCase):
-    def test_environment_auth_is_enforced_by_playground_entrypoint(self) -> None:
-        cases = (
-            (
-                {"OPENJEV_ORIGIN_SECRET": "origin-secret"},
-                {},
-                {"X-Origin-Secret": "origin-secret"},
-            ),
-            (
-                {"OPENJEV_API_KEY": "api-secret"},
-                {},
-                {"Authorization": "Bearer api-secret"},
-            ),
-        )
-        for environment, unauthorized_headers, authorized_headers in cases:
-            with self.subTest(environment=environment):
-                self._exercise_entrypoint(
-                    environment, unauthorized_headers, authorized_headers
-                )
-
-    def _exercise_entrypoint(
-        self,
-        extra_environment: dict[str, str],
-        unauthorized_headers: dict[str, str],
-        authorized_headers: dict[str, str],
-    ) -> None:
-        with socket.socket() as probe:
-            probe.bind(("127.0.0.1", 0))
-            port = probe.getsockname()[1]
-
-        environment = os.environ.copy()
-        environment.pop("OPENJEV_API_KEY", None)
-        environment.pop("OPENJEV_ORIGIN_SECRET", None)
-        environment.update(extra_environment)
-        environment["PYTHONPATH"] = str(Path(__file__).parents[1] / "src")
-
-        process = subprocess.Popen(
-            [
-                sys.executable,
-                "-m",
-                "playground.run_mock",
-                "--port",
-                str(port),
-            ],
-            cwd=Path(__file__).parents[1],
-            env=environment,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-        )
-        base_url = f"http://127.0.0.1:{port}"
-        try:
-            deadline = time.monotonic() + 10
-            while True:
-                if process.poll() is not None:
-                    output, _ = process.communicate()
-                    self.fail(f"playground exited before becoming healthy:\n{output}")
-                try:
-                    with urllib.request.urlopen(base_url + "/health", timeout=0.2):
-                        break
-                except (OSError, urllib.error.URLError):
-                    if time.monotonic() >= deadline:
-                        self.fail("playground did not become healthy")
-                    time.sleep(0.05)
-
-            with self.assertRaises(urllib.error.HTTPError) as caught:
-                urllib.request.urlopen(
-                    urllib.request.Request(
-                        base_url + "/v1/models", headers=unauthorized_headers
-                    )
-                )
-            error = caught.exception
-            self.assertEqual(error.code, 403)
-            error.close()
-
-            with urllib.request.urlopen(
-                urllib.request.Request(
-                    base_url + "/v1/models", headers=authorized_headers
-                )
-            ) as response:
-                self.assertIn("models", json.load(response))
-        finally:
-            if process.poll() is None:
-                process.terminate()
-                try:
-                    process.wait(timeout=5)
-                except subprocess.TimeoutExpired:
-                    process.kill()
-                    process.wait(timeout=5)
-            if process.stdout is not None:
-                process.stdout.close()
 
 
 if __name__ == "__main__":
