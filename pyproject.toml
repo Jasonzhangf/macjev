@@ -1,6 +1,6 @@
 [project]
 name = "macjev"
-version = "0.1.1+build.1"
+version = "0.1.2+build.2"
 description = "Mac-native Jev-compatible backend experiment on DiffusionGemma"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -27,7 +27,7 @@ where = ["src"]
 macjev = ["skills/*/SKILL.md"]
 
 [tool.macjev]
-build = 1
+build = 2
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
