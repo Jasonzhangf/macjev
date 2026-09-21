@@ -220,6 +220,64 @@ class ReleaseTests(unittest.TestCase):
                 (target / "example" / "SKILL.md").read_text(encoding="utf-8"),
                 "skill\n",
             )
+            self.assertEqual(
+                (target / "example" / release_module.SKILL_MARKER).read_text(
+                    encoding="utf-8"
+                ),
+                "name=example\n",
+            )
+
+    def test_install_skills_replaces_owned_target_without_backup(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = root / "source"
+            target = root / "target"
+            skill = source / "example"
+            skill.mkdir(parents=True)
+            (skill / "SKILL.md").write_text("new\n", encoding="utf-8")
+            installed = target / "example"
+            installed.mkdir(parents=True)
+            (installed / release_module.SKILL_MARKER).write_text(
+                "name=example\n",
+                encoding="utf-8",
+            )
+            (installed / "SKILL.md").write_text("old\n", encoding="utf-8")
+
+            with mock.patch.object(release_module, "SKILLS_TARGET", target):
+                release_module.install_skills(source)
+
+            self.assertEqual(
+                (installed / "SKILL.md").read_text(encoding="utf-8"),
+                "new\n",
+            )
+            self.assertEqual(
+                [path.name for path in target.iterdir()],
+                ["example"],
+            )
+
+    def test_install_skills_rejects_unowned_target(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = root / "source"
+            target = root / "target"
+            skill = source / "example"
+            skill.mkdir(parents=True)
+            (skill / "SKILL.md").write_text("new\n", encoding="utf-8")
+            installed = target / "example"
+            installed.mkdir(parents=True)
+            (installed / "SKILL.md").write_text("user\n", encoding="utf-8")
+
+            with mock.patch.object(release_module, "SKILLS_TARGET", target):
+                with self.assertRaisesRegex(
+                    release_module.ConfigError,
+                    "unowned Skill target",
+                ):
+                    release_module.install_skills(source)
+
+            self.assertEqual(
+                (installed / "SKILL.md").read_text(encoding="utf-8"),
+                "user\n",
+            )
 
     def test_verify_installed_entrypoints_checks_cli_and_mcp(self) -> None:
         output = "\n".join(
@@ -357,6 +415,32 @@ class ReleaseTests(unittest.TestCase):
                 parsed["model_providers"]["test"]["base_url"],
                 "http://127.0.0.1:1",
             )
+
+    def test_install_mcp_preserves_other_keys_in_macjev_table(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            config = Path(temporary) / "config.toml"
+            config.write_text(
+                "\n".join(
+                    [
+                        "[mcp_servers.macjev]",
+                        'command = "/old/macjev-mcp"',
+                        'args = ["--debug"]',
+                        "",
+                        "[mcp_servers.macjev.env]",
+                        'EXTRA = "kept"',
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            release_module.install_mcp(config, command="/new/macjev-mcp")
+
+            parsed = tomllib.loads(config.read_text(encoding="utf-8"))
+            table = parsed["mcp_servers"]["macjev"]
+            self.assertEqual(table["command"], "/new/macjev-mcp")
+            self.assertEqual(table["args"], ["--debug"])
+            self.assertEqual(table["env"]["EXTRA"], "kept")
 
 
 if __name__ == "__main__":

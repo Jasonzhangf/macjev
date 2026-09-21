@@ -15,6 +15,7 @@ from pathlib import Path
 from .errors import ConfigError
 
 SKILLS_TARGET = Path("~/.agents/skills").expanduser()
+SKILL_MARKER = ".macjev-skill"
 MCP_CONFIG = Path("~/.codex/config.toml").expanduser()
 MCP_NAME = "macjev"
 BUILD_START = 0
@@ -352,6 +353,25 @@ def _tree_digest(root: Path) -> str:
     return digest.hexdigest()
 
 
+def _require_owned_skill(target: Path, source: Path) -> None:
+    if target.is_symlink():
+        raise ConfigError(f"refusing to replace symlinked Skill target: {target}")
+    marker = target / SKILL_MARKER
+    if marker.is_file():
+        try:
+            marker_value = marker.read_text(encoding="utf-8")
+        except (OSError, UnicodeError) as exc:
+            raise ConfigError(f"cannot read Skill ownership marker {marker}: {exc}") from exc
+        if marker_value != f"name={target.name}\n":
+            raise ConfigError(f"Skill ownership marker does not match target: {marker}")
+        return
+    if not target.is_dir() or _tree_digest(target) != _tree_digest(source):
+        raise ConfigError(
+            f"refusing to replace unowned Skill target: {target}; "
+            "move it aside or install the packaged Skill manually"
+        )
+
+
 def install_skills(source_root: str | Path | None = None) -> list[Path]:
     """Install MacJev's packaged runtime Skills into the global Skill root."""
 
@@ -368,11 +388,41 @@ def install_skills(source_root: str | Path | None = None) -> list[Path]:
         if not skill_source.is_dir() or not (skill_source / "SKILL.md").is_file():
             continue
         target = SKILLS_TARGET / skill_source.name
-        if target.exists():
-            shutil.rmtree(target)
-        shutil.copytree(skill_source, target)
-        if _tree_digest(skill_source) != _tree_digest(target):
-            raise ConfigError(f"installed Skill digest mismatch: {target}")
+        if target.exists() or target.is_symlink():
+            _require_owned_skill(target, skill_source)
+        staging_root = Path(
+            tempfile.mkdtemp(prefix=f".{target.name}.macjev-", dir=SKILLS_TARGET)
+        )
+        staged = staging_root / target.name
+        backup = staging_root / "previous"
+        cleanup_staging = True
+        try:
+            shutil.copytree(skill_source, staged)
+            if _tree_digest(skill_source) != _tree_digest(staged):
+                raise ConfigError(f"staged Skill digest mismatch: {target}")
+            (staged / SKILL_MARKER).write_text(
+                f"name={target.name}\n",
+                encoding="utf-8",
+            )
+            if target.exists():
+                os.replace(target, backup)
+                try:
+                    os.replace(staged, target)
+                except Exception:
+                    try:
+                        os.replace(backup, target)
+                    except OSError as exc:
+                        cleanup_staging = False
+                        raise ConfigError(
+                            f"cannot restore Skill after failed install; "
+                            f"backup retained at {backup}"
+                        ) from exc
+                    raise
+            else:
+                os.replace(staged, target)
+        finally:
+            if cleanup_staging:
+                shutil.rmtree(staging_root, ignore_errors=True)
         installed.append(target)
     if not installed:
         raise ConfigError(f"no installable Skills found in {source}")
@@ -459,17 +509,26 @@ def install_mcp(
     original = target.read_text(encoding="utf-8") if target.exists() else ""
     lines = original.splitlines()
     header = f"[mcp_servers.{MCP_NAME}]"
-    replacement = [header, f"command = {_toml_quote(command or _mcp_command())}"]
+    command_line = f"command = {_toml_quote(command or _mcp_command())}"
     if header in lines:
         index = lines.index(header)
         end = index + 1
         while end < len(lines) and not lines[end].startswith("["):
             end += 1
-        lines[index:end] = replacement
+        command_index = None
+        for candidate in range(index + 1, end):
+            key = lines[candidate].split("=", 1)[0].strip()
+            if key == "command":
+                command_index = candidate
+                break
+        if command_index is None:
+            lines.insert(index + 1, command_line)
+        else:
+            lines[command_index] = command_line
     else:
         if lines and lines[-1] != "":
             lines.append("")
-        lines.extend(replacement)
+        lines.extend([header, command_line])
     rendered = "\n".join(lines) + "\n"
     try:
         tomllib.loads(rendered)
