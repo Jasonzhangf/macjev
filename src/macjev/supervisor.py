@@ -15,6 +15,9 @@ from pathlib import Path
 from .config import MacJevConfig
 from .errors import DaemonError
 
+MODEL_REPO = "mmastrac/diffgemma-26b-a4b-it-q4"
+MODEL_REVISION = "be312db884e99c963518a5e5a97de6080263f2a8"
+
 
 @dataclass(frozen=True)
 class DaemonStatus:
@@ -107,10 +110,10 @@ class RuntimeSupervisor:
 
         self.config.paths.run_dir.mkdir(parents=True, exist_ok=True)
         self.config.paths.log_dir.mkdir(parents=True, exist_ok=True)
-        if self.config.daemon.model_path is None or not self.config.daemon.model_path.is_dir():
-            raise DaemonError(
-                f"daemon.model_path is not a directory: {self.config.daemon.model_path}"
-            )
+        if self.config.daemon.model_path is None:
+            raise DaemonError("daemon.model_path is not configured")
+        if not self.config.daemon.model_path.is_dir():
+            self._download_model()
         if self.config.daemon.working_dir is not None and not self.config.daemon.working_dir.is_dir():
             raise DaemonError(
                 f"daemon.working_dir is not a directory: {self.config.daemon.working_dir}"
@@ -146,6 +149,37 @@ class RuntimeSupervisor:
             self._remove_pid_file()
             raise
         return process.pid, True
+
+    def _download_model(self) -> None:
+        assert self.config.daemon.model_path is not None
+        target = self.config.daemon.model_path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        command = [
+            self.config.daemon.executable,
+            "download",
+            "--repo",
+            MODEL_REPO,
+            "--revision",
+            MODEL_REVISION,
+            "-o",
+            str(target),
+        ]
+        try:
+            completed = subprocess.run(
+                command,
+                cwd=self.config.daemon.working_dir or Path.cwd(),
+                text=True,
+                capture_output=True,
+            )
+        except OSError as exc:
+            raise DaemonError(
+                f"cannot download model with {self.config.daemon.executable!r}: {exc}"
+            ) from exc
+        if completed.returncode != 0:
+            detail = completed.stderr.strip() or completed.stdout.strip()
+            raise DaemonError(f"model download failed for {target}: {detail}")
+        if not target.is_dir():
+            raise DaemonError(f"model download did not create {target}")
 
     def stop(self) -> bool:
         """Stop the daemon recorded in the PID file.

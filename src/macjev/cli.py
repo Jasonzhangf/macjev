@@ -19,6 +19,7 @@ from .config import (
 )
 from .errors import ConfigError, DaemonError, MacJevError
 from .http import serve
+from .release import build_version, release
 from .service import DecisionService
 from .supervisor import RuntimeSupervisor
 
@@ -38,6 +39,11 @@ class _RemainderArgs(argparse.Action):
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="macjev")
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"%(prog)s {build_version()}",
+    )
     parser.add_argument(
         "--config",
         default=str(DEFAULT_CONFIG_PATH),
@@ -79,6 +85,21 @@ def _build_parser() -> argparse.ArgumentParser:
         nargs=argparse.REMAINDER,
         action=_RemainderArgs,
         default=[],
+    )
+
+    release_parser = subparsers.add_parser(
+        "release",
+        help="bump, test, build, and globally install MacJev",
+    )
+    release_parser.add_argument(
+        "--bump",
+        choices=("major", "minor", "patch", "stable", "alpha", "beta", "rc", "post", "dev"),
+        default="patch",
+    )
+    release_parser.add_argument(
+        "--start-daemon",
+        action="store_true",
+        help="start the configured managed daemon after installation",
     )
     return parser
 
@@ -181,6 +202,11 @@ def _optiq_serve(args: argparse.Namespace) -> int:
     return completed.returncode
 
 
+def _release(args: argparse.Namespace) -> int:
+    _print_json(release(args.bump, start_daemon=args.start_daemon))
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
@@ -193,6 +219,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             return _serve(args)
         if args.command == "optiq-serve":
             return _optiq_serve(args)
+        if args.command == "release":
+            return _release(args)
     except (ConfigError, DaemonError, MacJevError) as exc:
         print(f"macjev: error: {exc}", file=sys.stderr)
         return 2

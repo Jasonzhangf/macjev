@@ -7,10 +7,14 @@ contracts.
 
 ## Project Truth
 
-- Purpose and user-visible contract: MacJev is a Mac-native, Jev-compatible
-  decision service. It preserves the OpenJev request and response contract
-  while replacing the inference backend with the local Metal implementation of
-  DiffusionGemma.
+- Purpose and user-visible contract: MacJev is a foundation-capability enabler
+  for applications, not an application or browser runtime. Its current public
+  service preserves the OpenJev request and response contract while replacing
+  the inference backend with the local Metal implementation of
+  DiffusionGemma. Browser guard/repair and vision/computer-use are standard
+  capability interfaces; object identification and tracking are deferred
+  extensions. [docs/product-positioning.md](docs/product-positioning.md) owns
+  the positioning and roadmap.
 - Active implementation and production entrypoints: `src/macjev/` owns the
   service, configuration, HTTP boundary, and managed daemon lifecycle;
   `scripts/macjev-server` and `macjev.cli` are the production entries;
@@ -106,7 +110,9 @@ clear. Guide may assist; enabling it is not a prerequisite.
 
 | Need | Project-owned source |
 | --- | --- |
-| requirements and architecture | [GOAL.md](GOAL.md), [PLAN.md](PLAN.md), and [docs/architecture.md](docs/architecture.md) |
+| requirements and architecture | [docs/product-positioning.md](docs/product-positioning.md), [GOAL.md](GOAL.md), [PLAN.md](PLAN.md), and [docs/architecture.md](docs/architecture.md) |
+| browser guard and repair contract | [docs/browser-guard-repair-api.md](docs/browser-guard-repair-api.md) and [src/macjev/skills/browser-guard-repair/SKILL.md](src/macjev/skills/browser-guard-repair/SKILL.md) |
+| vision and computer-use contract | [docs/vision-computer-use-api.md](docs/vision-computer-use-api.md) and [src/macjev/skills/vision-computer-use/SKILL.md](src/macjev/skills/vision-computer-use/SKILL.md) |
 | feature development and debug | the owning module under `src/macjev/` and the project regression command declared in `.appsdk/project.json` |
 | build, install, restart, and replay | [docs/production-runtime.md](docs/production-runtime.md) |
 | review and delivery | [AGENTS.md](AGENTS.md) and the declared AppSDK verification contract |

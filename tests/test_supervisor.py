@@ -34,6 +34,106 @@ class _HealthHandler(BaseHTTPRequestHandler):
 
 
 class SupervisorTests(unittest.TestCase):
+    def test_downloads_missing_model_before_starting(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            model = root / "model"
+            config_path = root / "config.toml"
+            config_path.write_text(
+                f"""
+[server]
+host = "127.0.0.1"
+port = 18091
+
+[backend]
+type = "diffgemma"
+base_url = "http://127.0.0.1:18080"
+model = "test"
+
+[daemon]
+managed = true
+executable = "diffgemma"
+model_path = "{model}"
+
+[paths]
+run_dir = "{root / 'run'}"
+log_dir = "{root / 'log'}"
+""",
+                encoding="utf-8",
+            )
+            supervisor = RuntimeSupervisor(load_config(config_path))
+
+            def download(command, **kwargs):
+                model.mkdir()
+                return mock.Mock(returncode=0, stdout="", stderr="")
+
+            with (
+                mock.patch.object(supervisor, "_healthy", side_effect=[False, True]),
+                mock.patch("macjev.supervisor.subprocess.run", side_effect=download) as run,
+                mock.patch("macjev.supervisor.subprocess.Popen") as popen,
+                mock.patch.object(supervisor, "_write_pid"),
+            ):
+                popen.return_value.pid = 12345
+                pid, started = supervisor.start()
+
+            self.assertEqual((pid, started), (12345, True))
+            self.assertEqual(
+                run.call_args.args[0],
+                [
+                    "diffgemma",
+                    "download",
+                    "--repo",
+                    "mmastrac/diffgemma-26b-a4b-it-q4",
+                    "--revision",
+                    "be312db884e99c963518a5e5a97de6080263f2a8",
+                    "-o",
+                    str(model.resolve()),
+                ],
+            )
+
+    def test_model_download_failure_aborts_start(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            model = root / "model"
+            config_path = root / "config.toml"
+            config_path.write_text(
+                f"""
+[server]
+host = "127.0.0.1"
+port = 18091
+
+[backend]
+type = "diffgemma"
+base_url = "http://127.0.0.1:18080"
+model = "test"
+
+[daemon]
+managed = true
+executable = "diffgemma"
+model_path = "{model}"
+
+[paths]
+run_dir = "{root / 'run'}"
+log_dir = "{root / 'log'}"
+""",
+                encoding="utf-8",
+            )
+            supervisor = RuntimeSupervisor(load_config(config_path))
+
+            with (
+                mock.patch("macjev.supervisor.subprocess.run") as run,
+                mock.patch("macjev.supervisor.subprocess.Popen") as popen,
+            ):
+                run.return_value = mock.Mock(
+                    returncode=1,
+                    stdout="",
+                    stderr="network unavailable",
+                )
+                with self.assertRaisesRegex(DaemonError, "network unavailable"):
+                    supervisor.start()
+
+            popen.assert_not_called()
+
     def test_builds_managed_diffgemma_command(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

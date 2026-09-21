@@ -1,13 +1,17 @@
 [project]
 name = "macjev"
-version = "0.0.1"
+version = "0.1.0"
 description = "Mac-native Jev-compatible backend experiment on DiffusionGemma"
 readme = "README.md"
 requires-python = ">=3.11"
-license = { text = "Apache-2.0" }
+license = "Apache-2.0"
 
 [project.scripts]
 macjev = "macjev.cli:main"
+macjev-mcp = "macjev.mcp:main"
+
+[project.optional-dependencies]
+vision = ["mlx-optiq==0.5.12"]
 
 [build-system]
 requires = ["setuptools>=69"]
@@ -18,6 +22,12 @@ package-dir = { "" = "src" }
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+macjev = ["skills/*/SKILL.md"]
+
+[tool.macjev]
+build = 0
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

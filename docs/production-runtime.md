@@ -82,17 +82,40 @@ Authentication is optional. When set, `api_key` requires
 
 ## Operations
 
+Release from a MacJev checkout:
+
+```bash
+macjev release --bump patch
+```
+
+The release command is the global-install entrypoint. It bumps the base
+version and the local build number, runs the declared project regression
+suite, builds the wheel, force-installs the `macjev` and `macjev-mcp` commands
+with `uv tool install`, installs the packaged guard/computer-use Skills into
+`~/.agents/skills`, and registers the MCP server in
+`~/.codex/config.toml`. Release requires a clean Git checkout, records the
+source commit and tree, verifies the installed CLI and MCP handshake, and
+writes the acceptance result to the manifest. The first user-visible build is
+`0.1.0001`, followed by `0.1.0002`, `0.1.0003`, and so on. The wheel uses a
+PEP 440 version with a build local segment. It does not start the model daemon
+unless `--start-daemon` is supplied.
+
 ```bash
 scripts/macjev-server
 scripts/macjev-server --no-daemon
-PYTHONPATH=src python3 -m macjev.cli daemon status
-PYTHONPATH=src python3 -m macjev.cli daemon stop
+macjev daemon status
+macjev daemon stop
 ```
 
 `macjev serve` stops a daemon only when that invocation started it. An
 already-running external or managed daemon is left running. `daemon stop`
 uses the PID file and verifies that the process command contains both
 `diffgemma` and the configured model path before sending `SIGTERM`.
+
+When `daemon.model_path` is missing, `daemon start` and `serve` first run the
+configured `diffgemma download` command for the pinned
+`mmastrac/diffgemma-26b-a4b-it-q4` revision. Download failure aborts startup;
+there is no mock or alternate-model fallback.
 
 Logs:
 
