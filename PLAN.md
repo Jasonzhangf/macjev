@@ -98,10 +98,11 @@ Exit criteria:
 
 ## M4: Evaluation Before Calibration
 
-Status: partial. The recorded fixtures cover accuracy, NLL, Brier, ECE, AURC,
-coverage-risk, option-order sensitivity, p50/p95 latency, prefill/denoise
-timing, wall-clock throughput, and concurrency 1/2/4. P90/P99 latency and
-explicit TTFT/process-startup measurements are not recorded.
+Status: partial. Recorded results cover accuracy, NLL, Brier, ECE, AURC,
+p50/p95 latency, prefill/denoise timing, wall-clock throughput, and
+concurrency 1/2/4. Coverage-risk and option-order sensitivity are
+implemented/available but not recorded for the evaluation run. P90/P99 latency
+and explicit TTFT/process-startup measurements are not recorded.
 
 Deliverables:
 
