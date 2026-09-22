@@ -3,8 +3,9 @@
 Status: proposed standard interface.
 
 This document defines how MacJev exposes bounded visual capability to
-computer-use and browser-use applications. It does not define a desktop
-executor or workflow runtime.
+computer-use and browser-use applications. The API surface itself defines no
+desktop executor and no workflow runtime; the companion framework below
+implements the desktop executor that consumes it.
 
 The implemented desktop-side companion that owns observation, guarding, and
 admitted execution is described in
