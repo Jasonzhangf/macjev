@@ -285,7 +285,7 @@ def _release(args: argparse.Namespace) -> int:
     return 0
 
 
-def _load_observation(path: str) -> tuple[MacOSComputerDriver, dict[str, Any], str]:
+def _load_observation(path: str) -> tuple[MacOSComputerDriver, ComputerService, str]:
     value = json.loads(Path(path).expanduser().read_text(encoding="utf-8"))
     if not isinstance(value, dict) or not isinstance(value.get("revision"), str):
         raise ConfigError(f"invalid observation file: {path}")
