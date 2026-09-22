@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Sequence
 
 from .backends.diffgemma import DiffGemmaBackend
+from .computer import ComputerService, MacOSComputerDriver
 from .config import (
     DEFAULT_CONFIG_PATH,
     MacJevConfig,
@@ -71,6 +72,11 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="do not start the managed model daemon",
     )
+    serve_parser.add_argument(
+        "--no-computer",
+        action="store_true",
+        help="disable the native macOS computer-use driver",
+    )
 
     optiq_parser = subparsers.add_parser(
         "optiq-serve",
@@ -85,6 +91,75 @@ def _build_parser() -> argparse.ArgumentParser:
         nargs=argparse.REMAINDER,
         action=_RemainderArgs,
         default=[],
+    )
+
+    computer_parser = subparsers.add_parser(
+        "computer",
+        help="observe and guard macOS windows through the native AX driver",
+    )
+    computer_subparsers = computer_parser.add_subparsers(
+        dest="computer_command",
+        required=True,
+    )
+    computer_subparsers.add_parser("windows", help="list capturable windows")
+    computer_subparsers.add_parser(
+        "daemon-status",
+        help="report the owned computer driver daemon",
+    )
+    computer_subparsers.add_parser(
+        "daemon-start",
+        help="start the persistent computer driver daemon",
+    )
+    computer_subparsers.add_parser(
+        "daemon-stop",
+        help="stop the owned computer driver daemon",
+    )
+    computer_observe = computer_subparsers.add_parser(
+        "observe",
+        help="write one observation with AX elements and a screenshot",
+    )
+    computer_observe.add_argument("--window", required=True)
+    computer_observe.add_argument(
+        "--observation-output",
+        required=True,
+        help="path for the complete observation JSON",
+    )
+    computer_guard = computer_subparsers.add_parser(
+        "guard",
+        help="guard a click against a stored observation",
+    )
+    computer_guard.add_argument("--observation", required=True)
+    computer_guard.add_argument("--element-id", required=True)
+    computer_act = computer_subparsers.add_parser(
+        "act",
+        help="execute a guarded click against a stored observation",
+    )
+    computer_act.add_argument("--observation", required=True)
+    computer_act.add_argument("--element-id", required=True)
+
+    computer_input = computer_subparsers.add_parser(
+        "input",
+        help="run one guarded keyboard or mouse operation against an observation",
+    )
+    computer_input.add_argument(
+        "operation",
+        choices=["click", "type-text", "key-tap", "scroll", "drag", "mouse-move"],
+    )
+    computer_input.add_argument("--observation", required=True)
+    computer_input.add_argument("--element-id")
+    computer_input.add_argument("--x", type=float)
+    computer_input.add_argument("--y", type=float)
+    computer_input.add_argument("--to-x", type=float)
+    computer_input.add_argument("--to-y", type=float)
+    computer_input.add_argument("--text")
+    computer_input.add_argument("--key")
+    computer_input.add_argument("--dx", type=float, default=0.0)
+    computer_input.add_argument("--dy", type=float, default=0.0)
+    computer_input.add_argument("--steps", type=int)
+    computer_input.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="report the guard verdict without performing the operation",
     )
 
     release_parser = subparsers.add_parser(
@@ -164,6 +239,9 @@ def _serve(args: argparse.Namespace) -> int:
             api_key=config.auth.api_key,
             origin_secret=config.auth.origin_secret,
             max_body_bytes=config.server.max_body_bytes,
+            computer_service=(
+                None if args.no_computer else ComputerService(MacOSComputerDriver())
+            ),
         )
     except MacJevError as exc:
         raise DaemonError(
@@ -207,6 +285,98 @@ def _release(args: argparse.Namespace) -> int:
     return 0
 
 
+def _load_observation(path: str) -> tuple[MacOSComputerDriver, dict[str, Any], str]:
+    value = json.loads(Path(path).expanduser().read_text(encoding="utf-8"))
+    if not isinstance(value, dict) or not isinstance(value.get("revision"), str):
+        raise ConfigError(f"invalid observation file: {path}")
+    driver = MacOSComputerDriver()
+    service = ComputerService(driver)
+    return driver, service, service.load_observation(value)
+
+
+def _computer(args: argparse.Namespace) -> int:
+    if args.computer_command.startswith("daemon-"):
+        driver = MacOSComputerDriver()
+        if args.computer_command == "daemon-status":
+            _print_json(driver.status())
+            return 0
+        if args.computer_command == "daemon-start":
+            pid, started = driver.start()
+            _print_json({**driver.status(), "pid": pid, "started": started})
+            return 0
+        _print_json({"stopped": driver.stop(), **driver.status()})
+        return 0
+    if args.computer_command == "windows":
+        driver = MacOSComputerDriver()
+        _print_json({"windows": driver.list_windows()})
+        return 0
+    if args.computer_command == "observe":
+        observation = ComputerService(MacOSComputerDriver()).observe(
+            {"window": args.window}
+        )
+        output = Path(args.observation_output).expanduser()
+        output.write_text(
+            json.dumps(observation, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        _print_json(
+            {
+                "revision": observation["revision"],
+                "window": observation["window"],
+                "element_count": len(observation["elements"]),
+                "screenshot": observation["screenshot"],
+                "observation_output": str(output),
+            }
+        )
+        return 0
+    driver, service, revision = _load_observation(args.observation)
+    if args.computer_command == "input":
+        return _computer_input(args, service, revision)
+    request = {
+        "revision": revision,
+        "operation": {"kind": "click", "element_id": args.element_id},
+    }
+    if args.computer_command == "guard":
+        _print_json(service.guard(request))
+        return 0
+    _print_json(service.act(request))
+    return 0
+
+
+def _computer_input(
+    args: argparse.Namespace,
+    service: ComputerService,
+    revision: str,
+) -> int:
+    """Build one operation from CLI flags and guard, then optionally run it."""
+
+    operation: dict[str, object] = {"kind": args.operation.replace("-", "_")}
+    if args.element_id:
+        operation["expected_element_id"] = args.element_id
+        operation["element_id"] = args.element_id
+    if args.x is not None and args.y is not None:
+        operation["point"] = {"x": args.x, "y": args.y}
+    if args.operation == "type-text":
+        operation["text"] = args.text
+        operation.pop("element_id", None)
+    if args.operation == "key-tap":
+        operation["key"] = args.key
+    if args.operation == "scroll":
+        operation["dx"] = args.dx
+        operation["dy"] = args.dy
+    if args.operation == "drag":
+        operation["from"] = {"x": args.x, "y": args.y}
+        operation["to"] = {"x": args.to_x, "y": args.to_y}
+        if args.steps is not None:
+            operation["steps"] = args.steps
+    request = {"revision": revision, "operation": operation}
+    if args.dry_run:
+        _print_json(service.guard(request))
+        return 0
+    _print_json(service.act(request))
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
@@ -219,6 +389,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             return _serve(args)
         if args.command == "optiq-serve":
             return _optiq_serve(args)
+        if args.command == "computer":
+            return _computer(args)
         if args.command == "release":
             return _release(args)
     except (ConfigError, DaemonError, MacJevError) as exc:

@@ -9,6 +9,9 @@ guard/repair and vision/computer-use use separate standard interfaces:
 
 - [docs/browser-guard-repair-api.md](docs/browser-guard-repair-api.md)
 - [docs/vision-computer-use-api.md](docs/vision-computer-use-api.md)
+- [docs/computer-use-framework.md](docs/computer-use-framework.md)
+- [docs/computer-use-containers.md](docs/computer-use-containers.md)
+- [docs/wechat-verification.md](docs/wechat-verification.md)
 
 Object identification and tracking are deferred extensions, not mainline
 capabilities.

@@ -6,6 +6,14 @@ This document defines how MacJev exposes bounded visual capability to
 computer-use and browser-use applications. It does not define a desktop
 executor or workflow runtime.
 
+The implemented desktop-side companion that owns observation, guarding, and
+admitted execution is described in
+[`computer-use-framework.md`](computer-use-framework.md).
+
+The model-facing contract for locating a control for the first time and
+replaying a recorded path is in the
+[`computer-use-path`](../src/macjev/skills/computer-use-path/SKILL.md) Skill.
+
 ## 1. Purpose
 
 MacJev answers bounded questions over supplied visual evidence. The

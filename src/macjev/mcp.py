@@ -6,6 +6,7 @@ import json
 import sys
 from typing import Any, BinaryIO
 
+from .computer import ComputerService, MacOSComputerDriver
 from .config import load_config
 from .release import build_version
 from .supervisor import RuntimeSupervisor
@@ -39,6 +40,7 @@ def _tool(name: str, description: str, properties: dict[str, Any]) -> dict[str, 
 
 def _tools() -> list[dict[str, Any]]:
     config = {"type": "string", "description": "Runtime TOML path."}
+    window = {"type": "string", "description": "Window id, bundle id, or app name."}
     return [
         _tool(
             "macjev_daemon_status",
@@ -55,21 +57,116 @@ def _tools() -> list[dict[str, Any]]:
             "Stop the managed DiffGemma daemon recorded by the configured PID file.",
             {"config": config},
         ),
+        _tool(
+            "macjev_computer_windows",
+            "List capturable macOS application windows.",
+            {},
+        ),
+        _tool(
+            "macjev_computer_observe",
+            "Return a fresh accessibility tree, screenshot, and revision for one window.",
+            {"window": window},
+        ),
+        _tool(
+            "macjev_computer_guard",
+            "Guard an operation against an observed revision and element id.",
+            {"revision": {"type": "string"}, "element_id": {"type": "string"}},
+        ),
+        _tool(
+            "macjev_computer_act",
+            (
+                "Execute one guarded accessibility click against an observed "
+                "revision and element id."
+            ),
+            {"revision": {"type": "string"}, "element_id": {"type": "string"}},
+        ),
+        _tool(
+            "macjev_computer_verify",
+            "Observe again and report whether an element is still present.",
+            {
+                "previous_revision": {"type": "string"},
+                "window": window,
+                "element_id": {"type": "string"},
+            },
+        ),
+        _tool(
+            "macjev_computer_input",
+            (
+                "Guard and execute one keyboard or mouse operation against an "
+                "observed revision. Supported kinds: click, set_value, "
+                "type_text, key_tap, scroll, drag, mouse_move. Keyboard kinds "
+                "require expected_element_id and the element must hold focus."
+            ),
+            {
+                "revision": {"type": "string"},
+                "operation": {"type": "object"},
+            },
+        ),
     ]
 
 
+_COMPUTER: ComputerService | None = None
+
+
+def _computer() -> ComputerService:
+    """Keep one driver/service per MCP process so revisions stay addressable."""
+
+    global _COMPUTER
+    if _COMPUTER is None:
+        _COMPUTER = ComputerService(MacOSComputerDriver())
+    return _COMPUTER
+
+
 def _call_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
-    config_path = arguments.get("config")
-    supervisor = RuntimeSupervisor(load_config(config_path))
-    if name == "macjev_daemon_status":
-        value = supervisor.status().as_dict()
-    elif name == "macjev_daemon_start":
-        pid, started = supervisor.start()
-        value = {"pid": pid, "started": started, "status": supervisor.status().as_dict()}
-    elif name == "macjev_daemon_stop":
-        value = {"stopped": supervisor.stop(), "status": supervisor.status().as_dict()}
+    if name.startswith("macjev_computer_"):
+        computer = _computer()
+        if name == "macjev_computer_windows":
+            value = {"windows": computer.driver.list_windows()}
+        elif name == "macjev_computer_observe":
+            value = computer.observe(arguments)
+        elif name == "macjev_computer_guard":
+            value = computer.guard(
+                {
+                    "revision": arguments.get("revision"),
+                    "operation": {
+                        "kind": "click",
+                        "element_id": arguments.get("element_id"),
+                    },
+                }
+            )
+        elif name == "macjev_computer_act":
+            value = computer.act(
+                {
+                    "revision": arguments.get("revision"),
+                    "operation": {
+                        "kind": "click",
+                        "element_id": arguments.get("element_id"),
+                    },
+                }
+            )
+        elif name == "macjev_computer_verify":
+            value = computer.verify(arguments)
+        elif name == "macjev_computer_input":
+            value = computer.act(
+                {
+                    "revision": arguments.get("revision"),
+                    "operation": arguments.get("operation"),
+                }
+            )
+        else:
+            raise ValueError(f"unknown tool: {name}")
     else:
-        raise ValueError(f"unknown tool: {name}")
+        config_path = arguments.get("config")
+        supervisor = RuntimeSupervisor(load_config(config_path))
+        if name == "macjev_daemon_status":
+            value = supervisor.status().as_dict()
+        elif name == "macjev_daemon_start":
+            pid, started = supervisor.start()
+            value = {"pid": pid, "started": started, "status": supervisor.status().as_dict()}
+        elif name == "macjev_daemon_stop":
+            value = {"stopped": supervisor.stop(), "status": supervisor.status().as_dict()}
+        else:
+            raise ValueError(f"unknown tool: {name}")
     return {
         "content": [
             {
