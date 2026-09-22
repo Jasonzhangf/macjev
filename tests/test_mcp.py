@@ -29,6 +29,12 @@ class McpTests(unittest.TestCase):
                 "macjev_daemon_status",
                 "macjev_daemon_start",
                 "macjev_daemon_stop",
+                "macjev_computer_windows",
+                "macjev_computer_observe",
+                "macjev_computer_guard",
+                "macjev_computer_act",
+                "macjev_computer_verify",
+                "macjev_computer_input",
             ],
         )
         self.assertEqual(responses[2]["result"], {})

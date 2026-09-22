@@ -9,7 +9,9 @@ import urllib.request
 from http.server import ThreadingHTTPServer
 from pathlib import Path
 
+from computer_fixtures import FakeComputerDriver
 from macjev.backends.mock import MockBackend
+from macjev.computer import ComputerService
 from macjev.http import MacJevHandler
 from macjev.service import DecisionService
 
@@ -22,7 +24,10 @@ class HttpTests(unittest.TestCase):
         handler = type(
             "TestMacJevHandler",
             (MacJevHandler,),
-            {"service": DecisionService(MockBackend())},
+            {
+                "service": DecisionService(MockBackend()),
+                "computer_service": ComputerService(FakeComputerDriver()),
+            },
         )
         cls.server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
         cls.thread = threading.Thread(target=cls.server.serve_forever, daemon=True)
@@ -152,6 +157,97 @@ class HttpTests(unittest.TestCase):
             result = json.load(response)
 
         self.assertEqual(result["model"], "openjev-0.1")
+
+    def test_computer_windows_and_observe(self) -> None:
+        windows = self.get_json("/v1/computer/windows")["windows"]
+        self.assertEqual(len(windows), 1)
+        self.assertEqual(windows[0]["application_id"], "com.example.fixture")
+
+        request = urllib.request.Request(
+            self.base_url + "/v1/computer/observe",
+            data=json.dumps({"window": "Fixture"}).encode(),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(request) as response:
+            observation = json.load(response)
+
+        self.assertTrue(observation["revision"].startswith("revision-"))
+        self.assertEqual(len(observation["elements"]), 6)
+        self.assertEqual(observation["screenshot"]["width"], 800)
+        self.assertEqual(
+            observation["diagnostics"]["accessibility"], "not_applicable"
+        )
+        guard = urllib.request.Request(
+            self.base_url + "/v1/computer/guard",
+            data=json.dumps(
+                {
+                    "revision": observation["revision"],
+                    "operation": {
+                        "kind": "click",
+                        "element_id": "element-press",
+                    },
+                }
+            ).encode(),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(guard) as response:
+            verdict = json.load(response)
+
+        self.assertEqual(verdict["verdict"], "allow")
+
+    def test_computer_guard_denies_stale_revision(self) -> None:
+        request = urllib.request.Request(
+            self.base_url + "/v1/computer/guard",
+            data=json.dumps(
+                {
+                    "revision": "missing",
+                    "operation": {
+                        "kind": "click",
+                        "element_id": "element-press",
+                    },
+                }
+            ).encode(),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(request) as response:
+            result = json.load(response)
+
+        self.assertEqual(result["verdict"], "deny")
+        self.assertEqual(result["reason_code"], "stale_revision")
+
+    def test_computer_act_returns_422_for_non_admitted_operation(self) -> None:
+        observe = urllib.request.Request(
+            self.base_url + "/v1/computer/observe",
+            data=json.dumps({"window": "Fixture"}).encode(),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(observe) as response:
+            observation = json.load(response)
+
+        act = urllib.request.Request(
+            self.base_url + "/v1/computer/act",
+            data=json.dumps(
+                {
+                    "revision": observation["revision"],
+                    "operation": {
+                        "kind": "click",
+                        "element_id": "element-disabled",
+                    },
+                }
+            ).encode(),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with self.assertRaises(urllib.error.HTTPError) as raised:
+            urllib.request.urlopen(act)
+
+        self.assertEqual(raised.exception.code, 422)
+        body = json.loads(raised.exception.read())
+        self.assertEqual(body["detail"]["error_type"], "computer_request_error")
 
 
 class AuthHttpTests(unittest.TestCase):

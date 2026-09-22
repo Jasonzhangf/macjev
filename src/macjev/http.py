@@ -8,6 +8,7 @@ import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
+from .computer import ComputerDriverError, ComputerService
 from .errors import BackendError, MacJevError, ModelNotFound
 from .service import MODEL_VERSION, DecisionService
 
@@ -33,6 +34,7 @@ class MacJevHandler(BaseHTTPRequestHandler):
     """Expose the minimal Jev-compatible MacJev API."""
 
     service: DecisionService
+    computer_service: ComputerService | None = None
     api_key = ""
     origin_secret = ""
     max_body_bytes = 1_048_576
@@ -88,6 +90,39 @@ class MacJevHandler(BaseHTTPRequestHandler):
                 return False
         return True
 
+    def _read_json(self) -> dict[str, Any] | None:
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+        except ValueError:
+            self._error(400, "invalid_request", "invalid Content-Length")
+            return None
+        if length <= 0 or length > self.max_body_bytes:
+            self._error(
+                413,
+                "invalid_request",
+                "request body is empty or too large",
+            )
+            return None
+        try:
+            value = json.loads(self.rfile.read(length))
+        except json.JSONDecodeError:
+            self._error(400, "invalid_json", "request body is not valid JSON")
+            return None
+        if not isinstance(value, dict):
+            self._error(400, "invalid_request", "request body must be an object")
+            return None
+        return value
+
+    def _computer(self) -> ComputerService | None:
+        if self.computer_service is None:
+            self._error(
+                503,
+                "capability_unavailable",
+                "computer-use driver is not configured",
+            )
+            return None
+        return self.computer_service
+
     def do_GET(self) -> None:
         if self.path == "/health":
             self._send(200, {"status": "ok", "backend": self.service.backend.name})
@@ -97,34 +132,60 @@ class MacJevHandler(BaseHTTPRequestHandler):
         if self.path == "/v1/models":
             self._send(200, {"models": MODELS})
             return
+        if self.path == "/v1/computer/windows":
+            computer = self._computer()
+            if computer is None:
+                return
+            try:
+                self._send(
+                    200,
+                    {
+                        "api_version": "1",
+                        "windows": computer.driver.list_windows(),
+                    },
+                )
+            except MacJevError as exc:
+                self._error(503, exc.error_type, str(exc))
+            return
         self._error(404, "not_found_error", "unknown route")
 
     def do_POST(self) -> None:
         if not self._check_auth():
             return
+        if self.path.startswith("/v1/computer/"):
+            computer = self._computer()
+            if computer is None:
+                return
+            request = self._read_json()
+            if request is None:
+                return
+            try:
+                if self.path == "/v1/computer/observe":
+                    result = computer.observe(request)
+                elif self.path == "/v1/computer/guard":
+                    result = computer.guard(request)
+                elif self.path == "/v1/computer/act":
+                    result = computer.act(request)
+                elif self.path == "/v1/computer/verify":
+                    result = computer.verify(request)
+                else:
+                    self._error(404, "not_found_error", "unknown route")
+                    return
+            except MacJevError as exc:
+                status = 503 if isinstance(exc, ComputerDriverError) else 422
+                self._error(status, exc.error_type, str(exc))
+                return
+            self._send(200, result)
+            return
         if self.path != "/v1/systemone":
             self._error(404, "not_found_error", "unknown route")
             return
-
-        try:
-            length = int(self.headers.get("Content-Length", "0"))
-        except ValueError:
-            self._error(400, "invalid_request", "invalid Content-Length")
-            return
-        if length <= 0 or length > self.max_body_bytes:
-            self._error(
-                413,
-                "invalid_request",
-                "request body is empty or too large",
-            )
+        request = self._read_json()
+        if request is None:
             return
 
         try:
-            request = json.loads(self.rfile.read(length))
             result = self.service.decide(request)
-        except json.JSONDecodeError:
-            self._error(400, "invalid_json", "request body is not valid JSON")
-            return
         except MacJevError as exc:
             if isinstance(exc, ModelNotFound):
                 status = 404
@@ -153,6 +214,7 @@ def serve(
     api_key: str | None = None,
     origin_secret: str | None = None,
     max_body_bytes: int = 1_048_576,
+    computer_service: ComputerService | None = None,
 ) -> None:
     if api_key is None:
         api_key = os.environ.get("OPENJEV_API_KEY", "")
@@ -163,6 +225,7 @@ def serve(
         (MacJevHandler,),
         {
             "service": service,
+            "computer_service": computer_service,
             "api_key": api_key,
             "origin_secret": origin_secret,
             "max_body_bytes": max_body_bytes,

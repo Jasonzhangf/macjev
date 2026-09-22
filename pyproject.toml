@@ -24,7 +24,7 @@ package-dir = { "" = "src" }
 where = ["src"]
 
 [tool.setuptools.package-data]
-macjev = ["skills/*/SKILL.md"]
+macjev = ["skills/*/SKILL.md", "computer_driver.swift"]
 
 [tool.macjev]
 build = 2
